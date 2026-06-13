@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# project-specific
+results/*.kv
+data/*.txt
+arxiv-*.zip
+*.incomplete
+.venv/
+
+# latex build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+
+
+# Added by cargo
+
+/target
