@@ -65,7 +65,7 @@ kvcdn delete <artifact-id> --project acme --yes
 ## First-time setup
 
 1. **Create the object-store bucket.** Any S3-compatible store works (Cloudflare R2, AWS S3, MinIO, etc.). Note the endpoint URL, access key, secret key, and bucket name.
-2. **Deploy the OIDC provider.** Follow `pocket-id/README.md` to deploy a private Pocket ID instance behind a Cloudflare Tunnel. Register a public client for the CLI with ID `kvcdn-cli`; no redirect URI is required because the CLI uses the OIDC device-code flow.
+2. **Deploy an OIDC provider.** Use any OpenID Connect provider that supports public/PKCE clients (for example, Pocket ID, Keycloak, or Authelia). Register a public client for the CLI with ID `kvcdn-cli`; no redirect URI is required because the CLI uses the OIDC device-code flow.
 3. **Create the Fly.io app.** From `backend/`, run `fly apps create kvcachestore`.
 4. **Set the backend secrets.** Use the `fly secrets set` command shown in [Hosted backend configuration](#hosted-backend-configuration).
 5. **Deploy the backend.** Run the Dagger deploy pipeline locally with a `FLY_API_TOKEN`:
