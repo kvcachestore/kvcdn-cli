@@ -46,13 +46,6 @@ func rustBuilder(src *dagger.Directory, targetTag string) *dagger.Container {
 		WithMountedCache("/src/target", targetCache)
 }
 
-// flyInstaller returns a container with the flyctl binary installed.
-func flyInstaller() *dagger.Container {
-	return dag.Container().
-		From("alpine/curl").
-		WithExec([]string{"sh", "-c", "curl -L https://fly.io/install.sh | sh"})
-}
-
 // Lint runs cargo fmt --check and cargo clippy.
 func (m *Kvcdn) Lint(ctx context.Context, src *dagger.Directory) error {
 	_, err := rustBuilder(src, "debug").
@@ -246,34 +239,3 @@ func (m *Kvcdn) Release(
 	return out, nil
 }
 
-// DeployBackend builds the backend Docker image and deploys it to Fly.io.
-// It expects a FLY_API_TOKEN secret to be available in the Dagger environment.
-// Fly secrets (KVCDN_S3_*, KVCDN_CONTROL_BUCKET, etc.) are managed out-of-band
-// with `fly secrets set` before calling this pipeline.
-func (m *Kvcdn) DeployBackend(ctx context.Context, src *dagger.Directory, flyApiToken *dagger.Secret) (*dagger.Container, error) {
-	backend := src.Directory("backend")
-
-	deployer := dag.Container().
-		From("node:22-alpine").
-		WithDirectory("/backend", backend).
-		WithWorkdir("/backend").
-		WithFile("/usr/local/bin/flyctl", flyInstaller().File("/root/.fly/bin/flyctl")).
-		WithSecretVariable("FLY_API_TOKEN", flyApiToken).
-		WithExec([]string{"sh", "-c", "flyctl deploy --app kvcachestore --dockerfile Dockerfile"})
-
-	return deployer.Sync(ctx)
-}
-
-// FlyCommand runs an arbitrary flyctl command in a container with the deploy token.
-// Useful for checking status, reading logs, or inspecting secrets when the local
-// CLI token is not available.
-func (m *Kvcdn) FlyCommand(ctx context.Context, flyApiToken *dagger.Secret, args []string) (string, error) {
-	cmd := append([]string{"flyctl"}, args...)
-	out, err := dag.Container().
-		From("alpine:latest").
-		WithFile("/usr/local/bin/flyctl", flyInstaller().File("/root/.fly/bin/flyctl")).
-		WithSecretVariable("FLY_API_TOKEN", flyApiToken).
-		WithExec(cmd).
-		Stdout(ctx)
-	return out, err
-}

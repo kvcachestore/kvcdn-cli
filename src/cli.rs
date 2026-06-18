@@ -180,7 +180,7 @@ pub struct ApiKeyArgs {
 
 #[derive(Parser, Clone)]
 pub enum ApiKeyCommand {
-    /// Save a kvcachestore API key (kv_<uuid>) encrypted on disk.
+    /// Save a KVCDN API key (kv_<hex>) encrypted on disk.
     Set {
         /// The API key copied from the KVCDN dashboard.
         #[arg(value_name = "KEY")]

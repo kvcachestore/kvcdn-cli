@@ -195,10 +195,10 @@ Or invoke Dagger directly:
 
 ```bash
 # Release without signing
-dagger call -m ci/dagger release --src=. export --path=./dist
+dagger call -m dagger release --src=. export --path=./dist
 
 # Release with cosign signing
-dagger call -m ci/dagger release --src=. --cosign-key=env:COSIGN_PRIVATE_KEY export --path=./dist
+dagger call -m dagger release --src=. --cosign-key=env:COSIGN_PRIVATE_KEY export --path=./dist
 ```
 
 The packaged artifact is written to:

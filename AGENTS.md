@@ -4,7 +4,7 @@
 
 - `src/` — Rust CLI (`kvcdn`). Entry point `src/main.rs`.
 - `backend/` — TypeScript/Fastify API. Entry point `backend/src/index.ts`.
-- `ci/dagger/` — Dagger module for Rust release builds, SBOM/scan/sign, and Fly backend deploys.
+- `dagger/` — Dagger module for Rust release builds, SBOM generation, Trivy scans, and optional cosign signing.
 - `scripts/` — `build-release.sh` and `build-backend-image.sh`.
 
 ## Daily commands
@@ -29,8 +29,7 @@ npm run dev       # tsx src/index.ts
 
 ## Tool paths
 
-- `flyctl` is used by the Dagger deploy pipeline; make sure it is on your `PATH`.
-- `dagger` is used by the release and deploy pipelines; make sure it is on your `PATH`.
+- `dagger` is used by the release pipeline; make sure it is on your `PATH`.
 
 ## Things that are easy to miss
 

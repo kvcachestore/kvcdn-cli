@@ -21,7 +21,7 @@ fi
 
 mkdir -p "$REPO_ROOT/dist"
 
-cd "$REPO_ROOT/ci/dagger"
+cd "$REPO_ROOT/dagger"
 
 COSIGN_ARG=""
 if [ -n "${COSIGN_PRIVATE_KEY:-}" ]; then
