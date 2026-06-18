@@ -18,6 +18,8 @@ pub fn run(args: crate::cli::LoginArgs) -> Result<()> {
         args.project,
         None,
     )?;
+
+    cfg.require_hosted()?;
     let oidc = discover(&cfg.issuer_url).context("OIDC discovery failed")?;
 
     let tokens = if oidc.supports_device_code() {

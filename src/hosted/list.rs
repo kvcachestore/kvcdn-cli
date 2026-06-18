@@ -12,6 +12,8 @@ pub fn run(args: crate::cli::ListArgs) -> Result<()> {
         args.project,
         args.api_key,
     )?;
+
+    cfg.require_hosted()?;
     let org = cfg.default_org.clone();
     let project = cfg.default_project.clone();
 

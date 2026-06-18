@@ -19,6 +19,8 @@ pub fn mint_api_key(
     let cfg = Config::load(api_url, None, None, None, None, None)
         .context("loading kvcdn configuration")?;
 
+    cfg.require_hosted()?;
+
     let admin_secret = admin_secret.ok_or_else(|| {
         anyhow!("missing admin secret; pass --admin-secret or set KVCDN_ADMIN_SECRET")
     })?;

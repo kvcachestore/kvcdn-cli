@@ -12,6 +12,8 @@ pub fn run(args: crate::cli::QuotaArgs) -> Result<()> {
         None,
         args.api_key,
     )?;
+
+    cfg.require_hosted()?;
     let mut client = ApiClient::new(cfg)?;
     let quota = client.get_quota().context("failed to fetch quota")?;
 

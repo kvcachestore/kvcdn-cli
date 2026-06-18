@@ -94,6 +94,8 @@ pub fn verify(
     let key = key.context("no API key provided; run `kvcdn api-key set <key>`")?;
 
     let cfg = Config::load(api_url, None, None, org, project, Some(key.clone()))?;
+
+    cfg.require_hosted()?;
     let org = cfg.default_org.clone();
     let project = cfg.default_project.clone();
     let url = verify_url(&cfg.api_url)?;

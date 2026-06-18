@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::Path;
 
-const DEFAULT_API_URL: &str = "https://<your-api-host>";
-const DEFAULT_ISSUER_URL: &str = "https://<your-issuer>";
+const DEFAULT_API_URL: &str = "";
+const DEFAULT_ISSUER_URL: &str = "";
 const DEFAULT_CLIENT_ID: &str = "kvcdn-cli";
 const DEFAULT_ORG: &str = "default";
 const DEFAULT_PROJECT: &str = "default";
@@ -140,6 +140,20 @@ impl Config {
         }
         let text = std::fs::read_to_string(&path)?;
         Ok(Some(toml::from_str(&text)?))
+    }
+
+    pub fn require_hosted(&self) -> Result<()> {
+        if self.api_url.is_empty() {
+            anyhow::bail!(
+                "api_url is not configured. Set KVCDN_API_URL or add api_url to ~/.config/kvcdn/config.toml."
+            );
+        }
+        if self.issuer_url.is_empty() {
+            anyhow::bail!(
+                "issuer_url is not configured. Set KVCDN_ISSUER_URL or add issuer_url to ~/.config/kvcdn/config.toml."
+            );
+        }
+        Ok(())
     }
 }
 
