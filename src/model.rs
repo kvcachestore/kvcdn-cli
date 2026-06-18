@@ -9,13 +9,21 @@ use hf_hub::api::sync::Api;
 use tokenizers::Tokenizer;
 
 use crate::common;
-use crate::qwen3_model::{Config, ModelForCausalLM};
+use crate::models::CausalLM;
 
 pub const DEFAULT_REVISION: &str = "c1899de289a04d12100db370d81485cdf75e47ca";
 
+/// Resolve the model revision from an explicit flag, the `HF_REVISION` environment
+/// variable, or the pinned `DEFAULT_REVISION`.
+pub fn resolve_revision(flag: Option<&str>) -> String {
+    flag.map(String::from)
+        .or_else(|| std::env::var("HF_REVISION").ok())
+        .unwrap_or_else(|| DEFAULT_REVISION.to_string())
+}
+
 pub struct ModelBundle {
     pub tokenizer: Tokenizer,
-    pub model: ModelForCausalLM,
+    pub model: Box<dyn CausalLM>,
     pub device: Device,
 }
 
@@ -24,8 +32,21 @@ struct SafetensorsIndex {
     weight_map: HashMap<String, String>,
 }
 
+#[derive(serde::Deserialize)]
+struct RawConfig {
+    architectures: Vec<String>,
+}
+
 pub fn load_model(model_name: &str, revision: &str, dtype: DType) -> Result<ModelBundle> {
-    let device = common::pick_device()?;
+    load_model_on(model_name, revision, dtype, common::pick_device()?)
+}
+
+pub fn load_model_on(
+    model_name: &str,
+    revision: &str,
+    dtype: DType,
+    device: Device,
+) -> Result<ModelBundle> {
     let api = Api::new()?;
     let repo = api.repo(Repo::with_revision(
         model_name.to_string(),
@@ -37,7 +58,13 @@ pub fn load_model(model_name: &str, revision: &str, dtype: DType) -> Result<Mode
     let tokenizer = Tokenizer::from_file(tokenizer_file).map_err(|e| anyhow::anyhow!(e))?;
 
     let config_file = repo.get("config.json")?;
-    let config: Config = serde_json::from_slice(&std::fs::read(config_file)?)?;
+    let raw: RawConfig = serde_json::from_slice(&std::fs::read(&config_file)?)?;
+
+    let architecture = raw
+        .architectures
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("unknown");
 
     // Discover safetensors files: prefer index, fall back to single file.
     let paths: Vec<PathBuf> = if let Ok(index_file) = repo.get("model.safetensors.index.json") {
@@ -59,11 +86,24 @@ pub fn load_model(model_name: &str, revision: &str, dtype: DType) -> Result<Mode
     };
 
     let vb = unsafe { VarBuilder::from_mmaped_safetensors(&paths, dtype, &device)? };
-    let model = ModelForCausalLM::new(&config, vb)?;
+
+    let model: Box<dyn CausalLM> = match crate::models::registry::dispatch(architecture) {
+        Some(loader) => loader(&config_file, vb, &device)?,
+        None => anyhow::bail!(crate::models::registry::unsupported_message(architecture)),
+    };
 
     Ok(ModelBundle {
         tokenizer,
         model,
         device,
     })
+}
+
+pub fn parse_device(s: &str) -> anyhow::Result<Device> {
+    match s.to_lowercase().as_str() {
+        "cpu" => Ok(Device::Cpu),
+        "cuda" | "gpu" => Ok(Device::new_cuda(0)?),
+        "metal" => Ok(Device::new_metal(0)?),
+        _ => anyhow::bail!("unsupported device '{}' (expected cpu, cuda, or metal)", s),
+    }
 }

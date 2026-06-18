@@ -1,33 +1,35 @@
 use std::fs;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use candle_core::DType;
 
 use crate::cli::VerifyArgs;
 use crate::continue_mod::generate;
 use crate::kv_io;
-use crate::model::{DEFAULT_REVISION, load_model};
+use crate::model::{load_model, resolve_revision};
+use crate::output::resolve_output_path;
 use crate::prefill::prefill;
-
-fn encode(tokenizer: &tokenizers::Tokenizer, text: &str, add_special_tokens: bool) -> Vec<u32> {
-    tokenizer
-        .encode(text, add_special_tokens)
-        .expect("tokenization failed")
-        .get_ids()
-        .to_vec()
-}
+use crate::tokenize::encode;
 
 pub fn run(args: VerifyArgs) -> Result<()> {
-    let mut bundle = load_model(&args.model, DEFAULT_REVISION, DType::F16)?;
+    let mut bundle = load_model(
+        &args.model,
+        &resolve_revision(args.revision.as_deref()),
+        DType::F16,
+    )?;
 
-    let context = ("Retrieval-augmented generation reuses documents across many ".to_string()
-        + "queries. Prefilling the same long document repeatedly wastes "
-        + "compute. ")
-        .repeat(20);
-    let question = "\n\nQ: Summarize the key claim in one sentence.\nA:";
+    let context = if let Some(path) = &args.context_file {
+        fs::read_to_string(path).with_context(|| format!("reading context file {path:?}"))?
+    } else {
+        ("Retrieval-augmented generation reuses documents across many ".to_string()
+            + "queries. Prefilling the same long document repeatedly wastes "
+            + "compute. ")
+            .repeat(20)
+    };
+    let question = &args.question;
 
-    let ctx_tokens = encode(&bundle.tokenizer, &context, true);
-    let q_tokens = encode(&bundle.tokenizer, question, false);
+    let ctx_tokens = encode(&bundle.tokenizer, &context, true)?;
+    let q_tokens = encode(&bundle.tokenizer, question, false)?;
 
     println!("device={:?}  model={}", bundle.device, args.model);
 
@@ -39,9 +41,12 @@ pub fn run(args: VerifyArgs) -> Result<()> {
     // Path B: prefill only context, save KV, load KV, continue.
     bundle.model.clear_kv_cache();
     prefill(&mut bundle, &ctx_tokens)?;
-    let cache = bundle.model.get_kv_cache();
-    fs::create_dir_all("results")?;
-    let art = kv_io::save_kv(&cache, &args.kv_path, &args.model)?;
+    let cache = bundle.model.get_kv_cache()?;
+    let kv_path = resolve_output_path("verify", &args.model, &args.kv_path, "kv")?;
+    if let Some(parent) = kv_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let art = kv_io::save_kv(&cache, &kv_path, &args.model)?;
     println!(
         "saved KV: {} tokens, {} layers, {:.1} MB, dtype={}",
         art.num_tokens,
@@ -49,10 +54,20 @@ pub fn run(args: VerifyArgs) -> Result<()> {
         art.nbytes as f64 / 1e6,
         art.dtype
     );
+    println!("KV artifact path: {}", kv_path.display());
 
-    let (cache, _) = kv_io::load_kv(&args.kv_path, &bundle.device)?;
-    bundle.model.set_kv_cache(cache);
+    let (cache, _) = kv_io::load_kv(&kv_path, &bundle.device)?;
+    bundle.model.set_kv_cache(cache)?;
     let b = generate(&mut bundle, &q_tokens, ctx_tokens.len(), args.n)?;
+
+    let mut mismatches: Vec<usize> = Vec::new();
+    for (i, (x, y)) in a.iter().zip(b.iter()).enumerate() {
+        if x != y {
+            mismatches.push(i);
+        }
+    }
+    let matched = mismatches.is_empty();
+    let match_count = args.n - mismatches.len();
 
     let a_text = bundle
         .tokenizer
@@ -65,17 +80,19 @@ pub fn run(args: VerifyArgs) -> Result<()> {
 
     println!("\nPath A (scratch): {a_text:?}");
     println!("Path B (kv):      {b_text:?}");
-
-    let matched = a == b;
     println!(
         "\ntoken match: {}/{}  ({})",
-        if matched { args.n } else { 0 },
+        match_count,
         args.n,
         if matched { "PASS" } else { "MISMATCH" }
     );
 
     if !matched {
-        anyhow::bail!("KV reuse did not match scratch prefill");
+        let idx_list: Vec<String> = mismatches.iter().map(|i| i.to_string()).collect();
+        anyhow::bail!(
+            "KV reuse did not match scratch prefill (mismatches at indices: {})",
+            idx_list.join(", ")
+        );
     }
     Ok(())
 }
