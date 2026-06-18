@@ -62,96 +62,19 @@ kvcdn download <artifact-id> --project acme --output context.q8.kv
 kvcdn delete <artifact-id> --project acme --yes
 ```
 
-## First-time setup
+The CLI reads backend and OIDC settings from `~/.config/kvcdn/config.toml` (or `KVCDN_*` environment variables) so that `kvcdn login`, `kvcdn upload`, and `kvcdn delete` can reach your deployed backend. The backend operator provides the `api_url` and `issuer_url` values; fill in the placeholders below with the values they give you:
 
-1. **Create the object-store bucket.** Any S3-compatible store works (Cloudflare R2, AWS S3, MinIO, etc.). Note the endpoint URL, access key, secret key, and bucket name.
-2. **Deploy an OIDC provider.** Use any OpenID Connect provider that supports public/PKCE clients (for example, Pocket ID, Keycloak, or Authelia). Register a public client for the CLI with ID `kvcdn-cli`; no redirect URI is required because the CLI uses the OIDC device-code flow.
-3. **Create the Fly.io app.** From `backend/`, run `fly apps create kvcachestore`.
-4. **Set the backend secrets.** Use the `fly secrets set` command shown in [Hosted backend configuration](#hosted-backend-configuration).
-5. **Deploy the backend.** Run the Dagger deploy pipeline locally with a `FLY_API_TOKEN`:
-   ```bash
-   dagger call -m ci/dagger deploy-backend --src=. --fly-api-token=env:FLY_API_TOKEN
-   ```
-6. **Configure the CLI.** Create `~/.config/kvcdn/config.toml`:
-   ```toml
-   api_url = "https://<your-api-host>"
-   issuer_url = "https://<your-issuer>"
-   client_id = "kvcdn-cli"
-   default_org = "acme"
-   default_project = "acme"
-   ```
-
-   All hosted commands accept `--org` and `--project` overrides. `default_org` is included for forward compatibility; the current backend routes by `project`, so most users will set both to the same value.
-7. **Authenticate and store an API key.** Run `kvcdn login` for interactive use, or mint an org-scoped API key with the admin endpoint and save it with `kvcdn api-key set <key>`. API keys are derived from `KVCDN_API_KEY_SEED` and scoped to one of the orgs in `KVCDN_API_KEY_ORGS`.
-
-## Hosted backend configuration
-
-The `backend/` service is deployed to Fly.io and needs the following secrets set on the app (e.g. `kvcachestore`):
-
-```bash
-fly secrets set --app kvcachestore \
-  KVCDN_S3_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com" \
-  KVCDN_S3_ACCESS_KEY="<r2-access-key-id>" \
-  KVCDN_S3_SECRET_KEY="<r2-secret-access-key>" \
-  KVCDN_S3_BUCKETS="<bucket-name>" \
-  KVCDN_CONTROL_BUCKET="<control-bucket-name>" \
-  KVCDN_ISSUER_URL="https://<your-issuer>" \
-  KVCDN_CLIENT_ID="kvcdn-cli" \
-  KVCDN_API_KEY_SEED="$(openssl rand -hex 32)" \
-  KVCDN_API_KEY_ORGS="acme,contoso" \
-  KVCDN_ADMIN_SECRET="$(openssl rand -hex 32)"
+```toml
+api_url = "https://<your-api-host>"
+issuer_url = "https://<your-issuer>"
+client_id = "kvcdn-cli"
+default_org = "acme"
+default_project = "acme"
 ```
 
-For this deployment the OIDC provider is exposed at `https://<your-issuer>`. If you deploy Pocket ID under your own domain, replace that value in both the backend secrets and the CLI config.
+All hosted commands accept `--org` and `--project` overrides. `default_org` is included for forward compatibility; the current backend routes by `project`, so most users will set both to the same value.
 
-- `KVCDN_S3_BUCKETS` — comma-separated list of S3-compatible bucket names (e.g. `kvcdn-artifacts-1,kvcdn-artifacts-2`). Tenants are deterministically assigned to one bucket. If only one bucket is configured, behavior is identical to the original single-bucket setup.
-- `KVCDN_S3_BUCKET` — legacy single-bucket name. Used as a fallback if `KVCDN_S3_BUCKETS` is not set.
-- `KVCDN_CONTROL_BUCKET` — bucket that stores tenant-to-bucket assignment records. This bucket should be created in the same S3 account/endpoint and is required when `KVCDN_S3_BUCKETS` has more than one entry.
-- `KVCDN_ISSUER_URL` — OIDC issuer URL for the Pocket ID (or other OpenID Connect) provider used to authenticate CLI users.
-- `KVCDN_CLIENT_ID` — OIDC client ID the CLI presents to the issuer. This must match a public/PKCE client registered in your OIDC provider.
-- `KVCDN_API_KEY_SEED` — master secret used to derive organization-scoped API keys with HKDF-SHA256. Generate once with `openssl rand -hex 32` and keep it secret; changing it invalidates all existing API keys.
-- `KVCDN_API_KEY_ORGS` — comma-separated list of allowed organization slugs (e.g. `acme,contoso`). Each slug gets a deterministic API key derived from `KVCDN_API_KEY_SEED`.
-- `KVCDN_ADMIN_SECRET` — bearer token required to call the `/v1/admin/api-keys` minting endpoint. Generate with `openssl rand -hex 32` and use it only when provisioning new org keys.
-
-### API key management
-
-Each configured org slug has a deterministic key. To mint a key for an org, call the operator-only admin endpoint:
-
-```bash
-curl -s -X POST "https://<your-api-host>/v1/admin/api-keys" \
-  -H "authorization: Bearer $KVCDN_ADMIN_SECRET" \
-  -H "content-type: application/json" \
-  -d '{"org_slug":"acme"}'
-```
-
-The response contains the derived `api_key` and stable `customer_id`. Save the key locally with:
-
-```bash
-kvcdn api-key set <api_key>
-```
-
-Org-scoped keys only work for their org. An artifact uploaded with one key is stored under `artifacts/customers/{customer_id}/` and cannot be listed, downloaded, or deleted by another org's key or OIDC subject.
-
-### Required token permissions
-
-| Service | Token / credential | Required permissions |
-| --- | --- | --- |
-| Cloudflare R2 (or S3-compatible store) | `KVCDN_S3_ACCESS_KEY` + `KVCDN_S3_SECRET_KEY` | `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` on the bucket. The backend generates presigned PUT URLs for uploads and reads/deletes objects directly, so listing the bucket is **not** required. |
-| OIDC provider (Pocket ID) | none stored in backend; public key discovery via `/.well-known/openid-configuration` | The backend only needs to fetch the provider's discovery document and JWKS endpoint, so no client secret or admin token is required. The CLI OIDC client must be configured as **public**; the CLI uses the OIDC device-code flow and does not need a redirect URI. |
-| Fly.io | your `flyctl` auth token | Permission to `fly apps create`, `fly secrets set`, `fly deploy`, and `fly volumes create` in the target organization. The CLI app (`kvcachestore`) only needs the secrets above; the tunnel sidecar uses a separate Cloudflare tunnel token. |
-| Cloudflare Tunnel | `TUNNEL_TOKEN` for the `cloudflared` sidecar | Permission to run the tunnel (`Access:Apps:Edit` or the tunnel-specific service token, depending on how the token was created). The tunnel only needs to ingress `pocketid.<yourdomain>` to the private Pocket ID app; it does not terminate TLS for the API or object store. |
-
-The CLI reads the same values from `~/.config/kvcdn/config.toml` (or `KVCDN_*` environment variables) so that `kvcdn login`, `kvcdn upload`, and `kvcdn delete` can reach your deployed backend and issuer.
-
-## License
-
-This project is licensed under the [kvcdn-cli Source-Available License](LICENSE).
-
-The Software is provided for personal, educational, research, and non-commercial
-evaluation purposes only. All commercial use and all commercial derivative works
-based on this source code are strictly prohibited. You may not sell, offer as a
-service, or incorporate this Software or any derivative work into a commercial
-product or business operation. See the full license text for details.
+Run `kvcdn login` to authenticate interactively, or store an org-scoped API key with `kvcdn api-key set <key>` for non-interactive use.
 
 ## Model support
 
@@ -286,27 +209,6 @@ Additional artifacts when signing is enabled:
 - `dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz.sig` — tarball cosign signature
 - `dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json.sig` — SBOM cosign signature
 
-### CI/CD deploy workflow
-
-The repository uses Dagger (not GitHub Actions) for deployments. Run the deploy
-pipeline locally after setting `FLY_API_TOKEN` in your environment:
-
-```bash
-export FLY_API_TOKEN="$(flyctl tokens create deploy -a kvcachestore -x 8760h)"
-dagger call -m ci/dagger deploy-backend --src=. --fly-api-token=env:FLY_API_TOKEN
-```
-
-Create an app-scoped deploy token for the `kvcachestore` app. This token is
-limited to deploying only that app and is valid for one year:
-
-```bash
-flyctl tokens create deploy -a kvcachestore -x 8760h
-```
-
-The pipeline builds the backend Docker image inside Dagger and pushes it to Fly.io's
-private app registry, then deploys it to the `kvcachestore` app. The image is never
-pushed to a public registry.
-
 ## Limits
 
 The backend is designed around presigned S3 URLs and stateless metadata:
@@ -323,14 +225,12 @@ The backend is designed around presigned S3 URLs and stateless metadata:
   the bucket. One customer cannot list, download, or delete another customer's
   artifacts, even if they know the artifact ID.
 
-## Hosted KV Cache Store beta limits
+## License
 
-When uploading to the hosted KV Cache Store service at [kvcachestore.com](https://kvcachestore.com),
-the following per-customer limits apply during the beta and will be lifted when the service exits beta:
+This project is licensed under the [kvcdn-cli Source-Available License](LICENSE).
 
-- **Organizations:** 32
-- **Collections:** 16
-- **Artifacts:** 64
-
-If you hit a limit, `kvcdn upload` will fail with the portal's quota-exceeded message.
-Delete existing resources to free up capacity, or wait until the beta limits are raised.
+The Software is provided for personal, educational, research and non-commercial
+evaluation purposes only. All commercial use and all commercial derivative works
+based on this source code are strictly prohibited. You may not sell, offer as a
+service, or incorporate this Software or any derivative work into a commercial
+product or business operation. See the full license text for details.
