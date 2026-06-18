@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::http::Client;
+use crate::hosted::http::Client;
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use serde_json::json;

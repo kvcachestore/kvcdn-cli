@@ -4,12 +4,12 @@ use anyhow::{Context, Result};
 use candle_core::DType;
 
 use crate::cli::VerifyArgs;
-use crate::continue_mod::generate;
-use crate::kv_io;
-use crate::model::{load_model, resolve_revision};
-use crate::output::resolve_output_path;
-use crate::prefill::prefill;
-use crate::tokenize::encode;
+use crate::core::output::resolve_output_path;
+use crate::local::continuation::generate;
+use crate::local::kv_io;
+use crate::local::prefill::prefill;
+use crate::local::tokenize::encode;
+use crate::models::engine::{load_model, resolve_revision};
 
 pub fn run(args: VerifyArgs) -> Result<()> {
     let mut bundle = load_model(

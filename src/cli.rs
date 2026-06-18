@@ -77,7 +77,7 @@ pub struct BenchmarkArgs {
     )]
     pub question: String,
     /// Device to run on: cpu, cuda, or metal. Auto-selected when omitted.
-    #[arg(long, value_parser = crate::model::parse_device)]
+    #[arg(long, value_parser = crate::models::engine::parse_device)]
     pub device: Option<candle_core::Device>,
 }
 
@@ -135,7 +135,7 @@ pub struct QuantArgs {
     #[arg(long, default_value = "F16")]
     pub target_dtype: String,
     /// Device to run on: cpu, cuda, or metal. Auto-selected when omitted.
-    #[arg(long, value_parser = crate::model::parse_device)]
+    #[arg(long, value_parser = crate::models::engine::parse_device)]
     pub device: Option<candle_core::Device>,
 }
 

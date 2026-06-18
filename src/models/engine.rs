@@ -8,7 +8,7 @@ use hf_hub::Repo;
 use hf_hub::api::sync::Api;
 use tokenizers::Tokenizer;
 
-use crate::common;
+use crate::core::common;
 use crate::models::CausalLM;
 
 pub const DEFAULT_REVISION: &str = "c1899de289a04d12100db370d81485cdf75e47ca";

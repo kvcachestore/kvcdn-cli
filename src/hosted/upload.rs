@@ -1,7 +1,7 @@
-use crate::api::{ApiClient, UploadMeta};
 use crate::config::Config;
-use crate::kv_io;
-use crate::transfer::{HttpTransfer, Transfer};
+use crate::hosted::api::{ApiClient, UploadMeta};
+use crate::hosted::transfer::{HttpTransfer, Transfer};
+use crate::local::kv_io;
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::fs::File;

@@ -1,6 +1,6 @@
 use crate::config::Config;
-use crate::credential_store::{CredentialStore, Credentials, FileCredentialStore};
-use crate::token_store::Tokens;
+use crate::hosted::credential_store::{CredentialStore, Credentials, FileCredentialStore};
+use crate::hosted::token_store::Tokens;
 use anyhow::{Context, Result, anyhow};
 use chrono::{Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,7 @@ pub struct UploadInitResponse {
 pub struct ApiClient {
     cfg: Config,
     credentials: Box<dyn CredentialStore>,
-    client: crate::http::Client,
+    client: crate::hosted::http::Client,
 }
 
 impl ApiClient {
@@ -92,7 +92,7 @@ impl ApiClient {
         Ok(Self {
             cfg,
             credentials,
-            client: crate::http::Client::default_timeout()?,
+            client: crate::hosted::http::Client::default_timeout()?,
         })
     }
 
@@ -123,7 +123,7 @@ impl ApiClient {
             .client
             .post_json(&url, &token, meta)
             .with_context(|| format!("POST {url}"))?;
-        let resp = crate::http::Client::require_auth_success(resp, &url)?;
+        let resp = crate::hosted::http::Client::require_auth_success(resp, &url)?;
         resp.json().context("parsing upload init response")
     }
 
@@ -134,7 +134,7 @@ impl ApiClient {
             .client
             .post_empty_bearer(&url, &token)
             .with_context(|| format!("POST {url}"))?;
-        crate::http::Client::require_auth_success(resp, &url)?;
+        crate::hosted::http::Client::require_auth_success(resp, &url)?;
         Ok(())
     }
 
@@ -145,7 +145,7 @@ impl ApiClient {
             .client
             .delete_bearer(&url, &token)
             .with_context(|| format!("DELETE {url}"))?;
-        crate::http::Client::require_auth_success(resp, &url)?;
+        crate::hosted::http::Client::require_auth_success(resp, &url)?;
         Ok(())
     }
 
@@ -156,7 +156,7 @@ impl ApiClient {
             .client
             .get_bearer(&url, &token)
             .with_context(|| format!("GET {url}"))?;
-        let resp = crate::http::Client::require_auth_success(resp, &url)?;
+        let resp = crate::hosted::http::Client::require_auth_success(resp, &url)?;
         let body: ListArtifactsResponse = resp.json().context("parsing artifact list response")?;
         Ok(body.artifacts)
     }
@@ -173,7 +173,7 @@ impl ApiClient {
             .client
             .get_bearer(&url, &token)
             .with_context(|| format!("GET {url}"))?;
-        let resp = crate::http::Client::require_auth_success(resp, &url)?;
+        let resp = crate::hosted::http::Client::require_auth_success(resp, &url)?;
         let body: DownloadInitResponse = resp.json().context("parsing download init response")?;
         Ok(body)
     }
@@ -186,12 +186,12 @@ impl ApiClient {
             .client
             .get_bearer(&url, &token)
             .with_context(|| format!("GET {url}"))?;
-        let resp = crate::http::Client::require_auth_success(resp, &url)?;
+        let resp = crate::hosted::http::Client::require_auth_success(resp, &url)?;
         resp.json().context("parsing quota response")
     }
 
     pub fn whoami_customer_id(&mut self) -> Result<String> {
-        use crate::http::Client;
+        use crate::hosted::http::Client;
         let token = self.bearer_token()?;
         let mut url = url::Url::parse(&self.cfg.api_url)?;
         url.path_segments_mut()
@@ -226,7 +226,7 @@ impl ApiClient {
             .as_ref()
             .ok_or_else(|| anyhow!("session expired; run `kvcdn login`"))?;
 
-        let oidc = crate::oidc::discover(&self.cfg.issuer_url)?;
+        let oidc = crate::hosted::oidc::discover(&self.cfg.issuer_url)?;
         let mut params = std::collections::HashMap::new();
         params.insert("grant_type", "refresh_token");
         params.insert("client_id", self.cfg.client_id.as_str());
@@ -236,7 +236,7 @@ impl ApiClient {
             .client
             .post_form(&oidc.token_endpoint, &params)
             .context("refresh token request")?;
-        let resp = crate::http::Client::require_success(resp, &oidc.token_endpoint)?;
+        let resp = crate::hosted::http::Client::require_success(resp, &oidc.token_endpoint)?;
 
         #[derive(serde::Deserialize)]
         struct RefreshResponse {
@@ -356,8 +356,8 @@ fn quota_url(api_url: &str) -> Result<String> {
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::credential_store::StaticCredentialStore;
-    use crate::token_store::Tokens;
+    use crate::hosted::credential_store::StaticCredentialStore;
+    use crate::hosted::token_store::Tokens;
     use chrono::{Duration as ChronoDuration, Utc};
 
     #[test]

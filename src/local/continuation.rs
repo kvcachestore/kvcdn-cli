@@ -1,7 +1,7 @@
 use anyhow::Result;
 use candle_core::Tensor;
 
-use crate::model::ModelBundle;
+use crate::models::engine::ModelBundle;
 
 fn argmax_token(logits: &Tensor) -> Result<u32> {
     let logits = logits.squeeze(0)?.squeeze(0)?;

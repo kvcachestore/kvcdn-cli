@@ -1,5 +1,5 @@
-use crate::api::ApiClient;
 use crate::config::Config;
+use crate::hosted::api::ApiClient;
 use anyhow::{Context, Result};
 
 pub fn run(args: crate::cli::DeleteArgs) -> Result<()> {

@@ -1,6 +1,6 @@
-use crate::api::{ApiClient, QuotaResponse};
-use crate::common::format_size;
 use crate::config::Config;
+use crate::core::common::format_size;
+use crate::hosted::api::{ApiClient, QuotaResponse};
 use anyhow::{Context, Result};
 
 pub fn run(args: crate::cli::QuotaArgs) -> Result<()> {

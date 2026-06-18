@@ -1,3 +1,5 @@
+pub mod engine;
+
 pub mod bloom;
 pub mod chatglm;
 pub mod deepseek2;

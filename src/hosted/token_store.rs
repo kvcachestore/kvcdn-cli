@@ -1,4 +1,4 @@
-use crate::crypto::{self, Key};
+use crate::core::crypto::{self, Key};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn save_and_load_round_trip() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let tokens = Tokens {
             access_token: "acc".to_string(),
             refresh_token: Some("ref".to_string()),
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn load_missing_returns_none() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let store = TokenStore::new(dir.path());
         assert!(store.load(&key).unwrap().is_none());
     }
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn delete_removes_credentials() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let tokens = Tokens {
             access_token: "acc".to_string(),
             refresh_token: None,
@@ -112,14 +112,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = TokenStore::new(dir.path());
         store.delete().unwrap();
-        assert!(store.load(&crate::crypto::random_key()).unwrap().is_none());
+        assert!(
+            store
+                .load(&crate::core::crypto::random_key())
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
     fn load_with_wrong_key_fails() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
-        let wrong_key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
+        let wrong_key = crate::core::crypto::random_key();
         let tokens = Tokens {
             access_token: "acc".to_string(),
             refresh_token: None,
@@ -133,7 +138,7 @@ mod tests {
     #[test]
     fn load_corrupted_file_fails() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let store = TokenStore::new(dir.path());
         fs::create_dir_all(dir.path()).unwrap();
         let path = dir.path().join("credentials.enc");
@@ -144,11 +149,11 @@ mod tests {
     #[test]
     fn load_malformed_json_after_decrypt_fails() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let store = TokenStore::new(dir.path());
         fs::create_dir_all(dir.path()).unwrap();
         let plaintext = b"this is not valid json";
-        let ciphertext = crate::crypto::encrypt(plaintext, &key).unwrap();
+        let ciphertext = crate::core::crypto::encrypt(plaintext, &key).unwrap();
         let path = dir.path().join("credentials.enc");
         fs::write(&path, ciphertext).unwrap();
         assert!(store.load(&key).is_err());

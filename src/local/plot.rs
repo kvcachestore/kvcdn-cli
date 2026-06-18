@@ -3,7 +3,7 @@ use plotters::prelude::*;
 use plotters::style::FontStyle;
 use std::fs;
 
-use crate::output::resolve_output_path;
+use crate::core::output::resolve_output_path;
 
 #[derive(Debug)]
 pub struct BenchRow {

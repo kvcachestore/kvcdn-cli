@@ -1,6 +1,6 @@
-use crate::api::ApiClient;
 use crate::config::Config;
-use crate::transfer::{HttpTransfer, Transfer};
+use crate::hosted::api::ApiClient;
+use crate::hosted::transfer::{HttpTransfer, Transfer};
 use anyhow::{Context, Result};
 
 pub fn run(args: crate::cli::DownloadArgs) -> Result<()> {

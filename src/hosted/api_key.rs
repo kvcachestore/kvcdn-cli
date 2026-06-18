@@ -1,6 +1,6 @@
 use crate::config::Config;
-use crate::crypto::{self, Key};
-use crate::token_store::TokenStore;
+use crate::core::crypto::{self, Key};
+use crate::hosted::token_store::TokenStore;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -98,7 +98,7 @@ pub fn verify(
     let project = cfg.default_project.clone();
     let url = verify_url(&cfg.api_url)?;
 
-    let client = crate::http::Client::default_timeout()?;
+    let client = crate::hosted::http::Client::default_timeout()?;
     let resp = client
         .post_empty_bearer(&url, &key)
         .with_context(|| format!("POST {url}"))?;
@@ -107,7 +107,7 @@ pub fn verify(
         println!("API key is invalid or revoked.");
         return Ok(());
     }
-    let resp = crate::http::Client::require_success(resp, &url)?;
+    let resp = crate::hosted::http::Client::require_success(resp, &url)?;
 
     #[derive(serde::Deserialize)]
     struct VerifyResponse {
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn api_key_store_round_trip() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let store = ApiKeyStore::new(dir.path());
         store
             .save("kv_a1b2c3d4e5f6789012345678a1b2c3d4", &key)
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn api_key_store_load_missing_returns_none() {
         let dir = tempfile::tempdir().unwrap();
-        let key = crate::crypto::random_key();
+        let key = crate::core::crypto::random_key();
         let store = ApiKeyStore::new(dir.path());
         assert!(store.load(&key).unwrap().is_none());
     }
@@ -175,7 +175,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = ApiKeyStore::new(dir.path());
         store.delete().unwrap();
-        assert!(store.load(&crate::crypto::random_key()).unwrap().is_none());
+        assert!(
+            store
+                .load(&crate::core::crypto::random_key())
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

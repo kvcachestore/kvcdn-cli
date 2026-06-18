@@ -1,6 +1,6 @@
 use crate::config::Config;
-use crate::crypto::{self, Key};
-use crate::token_store::{TokenStore, Tokens};
+use crate::core::crypto::{self, Key};
+use crate::hosted::token_store::{TokenStore, Tokens};
 use anyhow::{Context, Result, anyhow};
 use std::path::PathBuf;
 
@@ -28,7 +28,7 @@ impl FileCredentialStore {
         let api_key = cfg
             .api_key
             .clone()
-            .or_else(|| crate::api_key::load_stored_api_key().ok().flatten());
+            .or_else(|| crate::hosted::api_key::load_stored_api_key().ok().flatten());
         Ok(Self {
             api_key,
             key,

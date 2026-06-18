@@ -1,7 +1,7 @@
-use crate::api::ApiClient;
-use crate::api_key::load_stored_api_key;
 use crate::config::Config;
-use crate::token_store::{TokenStore, Tokens};
+use crate::hosted::api::ApiClient;
+use crate::hosted::api_key::load_stored_api_key;
+use crate::hosted::token_store::{TokenStore, Tokens};
 use anyhow::Result;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Deserialize;
@@ -86,7 +86,7 @@ fn resolve_auth(cfg: &Config) -> Result<Auth> {
 }
 
 fn load_stored_oidc_tokens() -> Result<Option<Tokens>> {
-    let key = crate::crypto::load_or_create_key()?;
+    let key = crate::core::crypto::load_or_create_key()?;
     let dir = TokenStore::default_dir()?;
     TokenStore::new(&dir).load(&key)
 }

@@ -1,0 +1,236 @@
+# kvcdn-cli
+
+Releasable command-line tool for KV-cache generation, verification, quantization, and hosted sharing for LLMs.
+
+## Why this project exists
+
+Large language models spend most of their inference time on the *prefill* phase: processing every token of a long document before generating the first new token. In retrieval-augmented generation, chat, and agent workflows, the same long context is reused across many queries. Re-computing its KV cache for every request wastes GPU time, increases latency, and raises cost.
+
+kvcdn makes that work reusable. It lets you:
+
+- **Generate** a KV cache from a long document once.
+- **Verify** that loading the cache and continuing from it is token-exact compared to a full prefill.
+- **Quantize** caches to reduce storage and bandwidth without breaking exact continuation.
+- **Share** caches privately or publicly through a hosted KVCDN endpoint, so downstream inference services can skip prefill entirely.
+
+In short, kvcdn turns the long-context prefill problem into a cache-and-serve problem. A practical application is an inference service that lets clients supply a KVCDN artifact reference; the service fetches and loads the prefill cache dynamically, then runs continuation generation against the cached context without repeating the expensive prefill.
+
+## Commands
+
+- `kvcdn verify` — verify that loading a saved KV cache produces token-exact output.
+- `kvcdn diag` — logits-level diagnostic comparing scratch vs. KV-cache paths.
+- `kvcdn benchmark` — measure prefill vs. continuation speedup.
+- `kvcdn plot` — summarize benchmark results.
+- `kvcdn quant` — quantize a KV artifact and optionally run token-exact verification.
+- `kvcdn login` — authenticate with the hosted service via OIDC.
+- `kvcdn logout` — remove stored OIDC tokens and API key.
+- `kvcdn api-key` — manage the stored KVCDN API key.
+- `kvcdn upload` — upload a KV artifact to your hosted KVCDN endpoint.
+- `kvcdn list` — list remote KV artifacts in a project.
+- `kvcdn download` — download a remote KV artifact by ID.
+- `kvcdn delete` — delete a remote KV artifact by ID.
+- `kvcdn whoami` — show the current user and active org/project.
+
+## File extension convention
+
+kvcdn uses `.kv` as the file extension for KV cache artifacts (for example, `context.kv`, `model.kv`, or `context.q8.kv` after quantization). The CLI's default output paths, upload/download examples, and hosted workflows all follow this convention.
+
+If you provide an explicit `--kv-path`, `--output`, or `--input` path that does not end in `.kv`, the CLI automatically appends `.kv` and prints a warning so the convention is enforced.
+
+## Local-only usage
+
+No authentication is required for local generation, verification, quantization, or benchmarking.
+
+## Hosted usage
+
+Run `kvcdn login` to authenticate. Use `kvcdn api-key set <key>` to store an API key for non-interactive uploads. Use `kvcdn upload <artifact.kv> --name <name>` to store caches in your hosted KVCDN endpoint. Artifacts are private by default; pass `--visibility public` to make an artifact fetchable without authentication.
+
+Common hosted workflows:
+
+```bash
+# Upload an artifact
+kvcdn upload context.q8.kv --name context --project acme
+
+# List artifacts in a project
+kvcdn list --project acme
+kvcdn list --project acme --format json
+
+# Download an artifact
+kvcdn download <artifact-id> --project acme --output context.q8.kv
+
+# Delete an artifact
+kvcdn delete <artifact-id> --project acme --yes
+```
+
+The CLI reads backend and OIDC settings from `~/.config/kvcdn/config.toml` (or `KVCDN_*` environment variables) so that `kvcdn login`, `kvcdn upload`, and `kvcdn delete` can reach your deployed backend. The backend operator provides the `api_url` and `issuer_url` values; fill in the placeholders below with the values they give you:
+
+```toml
+api_url = "https://<your-api-host>"
+issuer_url = "https://<your-issuer>"
+client_id = "kvcdn-cli"
+default_org = "acme"
+default_project = "acme"
+```
+
+All hosted commands accept `--org` and `--project` overrides. `default_org` is included for forward compatibility; the current backend routes by `project`, so most users will set both to the same value.
+
+Run `kvcdn login` to authenticate interactively, or store an org-scoped API key with `kvcdn api-key set <key>` for non-interactive use.
+
+## Model support
+
+`--model` accepts any Hugging Face model identifier. The loader inspects the model's `config.json` `architectures` field and dispatches to a matching adapter.
+
+### Example model for first-time users
+
+`Qwen/Qwen3-0.6B` is the recommended starting model. It is small enough to run on CPU,
+supports the Qwen3 architecture, and is permissively licensed for research and
+non-commercial use. Most examples in this README use it as the default:
+
+```bash
+kvcdn verify --model Qwen/Qwen3-0.6B --context-file context.txt
+```
+
+Replace the model identifier with any supported architecture once you are ready
+to move to larger checkpoints.
+
+Currently supported architectures:
+
+- `LlamaForCausalLM` (and Llama-3.1/3.2 fine-tunes)
+- `MistralForCausalLM` / `MixtralForCausalLM`
+- `YiForCausalLM`
+- `Qwen3ForCausalLM`
+- `GemmaForCausalLM` (and Gemma 2 fine-tunes)
+
+Known unsupported families (open an issue on GitHub to request them):
+
+- GLM / ChatGLM
+- Kimi / Moonshot / Moonlight
+- Mamba / RWKV / state-space models
+- Nemotron
+- Phi / Phi-3 / Phi-4
+- GPT-NeoX / GPT-2 / Bloom
+
+Adding a new family only requires implementing the `CausalLM` trait in `src/models/` and registering it in `src/models/registry.rs`.
+
+## Example usage
+
+Verify that a saved KV cache produces token-exact output:
+
+```bash
+kvcdn verify --kv-path context.kv \
+             --context-file context.txt \
+             --question "What is the main point?"
+```
+
+Benchmark full-prefill cost against one resident-KV continuation step and write a CSV:
+
+```bash
+kvcdn benchmark --lengths 128,256,512 --reps 10 --output bench.csv
+kvcdn plot --csv-path bench.csv --model Qwen/Qwen3-0.6B --out amortized-cost.png --max-n 500
+```
+
+`plot` produces an 840x600 PNG with log-log axes showing the break-even reuse count. Use `--out` to set the PNG path and `--max-n` to change the reuse-count range (default 1000). The default filename is timestamped under the data directory.
+
+Quantize a KV artifact with a target dequantization dtype and verify continuation accuracy:
+
+```bash
+kvcdn quant --context-file context.txt --question "What is the main point?" \
+            --target-dtype F32 --verify
+```
+
+Supported target dtypes: `F32`, `F16`, `BF16`, `FP8` (F8E4M3). `I8`, `U8`, `I4`, `U4`, `FP4`, and `FP1` are not supported because the artifact stores symmetric int8 values (U8) and Candle 0.10 does not implement `to_dtype` for FP4/FP1.
+
+## Build
+
+```bash
+# Local debug build
+cargo build
+
+# Local release build
+cargo build --release
+
+# Reproducible containerized release build (exports to ./dist/)
+./scripts/build-release.sh
+```
+
+The Dagger pipeline runs Rust and backend lint/test checks in parallel, then
+builds and strips an x86-64 Linux binary, packages it as
+`dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz`, generates an SPDX SBOM
+(`dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json`), and scans the tarball with
+Trivy. If `COSIGN_PRIVATE_KEY` is provided, it also produces cosign signatures
+(`.sig` files).
+
+### Runtime requirements
+
+The released Linux binary is built on `debian:bookworm` (glibc 2.36+) and links
+dynamically against a few system libraries. It should run on most recent
+Debian, Ubuntu, Fedora, and other glibc-based distributions. Before running it,
+you can check that the required shared libraries are present:
+
+```bash
+ldd kvcdn-x86_64-unknown-linux-gnu
+```
+
+Typical dynamic dependencies include:
+
+- `libc.so.6`
+- `libssl.so.3` and `libcrypto.so.3`
+- `libz.so.1`
+- `libstdc++.so.6`, `libgcc_s.so.1`, `libm.so.6`
+
+If your system ships OpenSSL 1.x instead of OpenSSL 3.x, or an older glibc, the
+binary will fail to start. In that case, build from source (`cargo build --release`)
+or run the Dagger pipeline on a host whose libraries match your target
+environment.
+
+### Release build
+
+Build and export the release binary locally using the Dagger module:
+
+```bash
+./scripts/build-release.sh
+```
+
+Or invoke Dagger directly:
+
+```bash
+# Release without signing
+dagger call -m ci/dagger release --src=. export --path=./dist
+
+# Release with cosign signing
+dagger call -m ci/dagger release --src=. --cosign-key=env:COSIGN_PRIVATE_KEY export --path=./dist
+```
+
+The packaged artifact is written to:
+`dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz`
+
+Additional artifacts when signing is enabled:
+- `dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json` — SPDX SBOM
+- `dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz.sig` — tarball cosign signature
+- `dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json.sig` — SBOM cosign signature
+
+## Limits
+
+The backend is designed around presigned S3 URLs and stateless metadata:
+
+- **Artifact size:** limited by your S3 provider's maximum object size and the
+  presigned URL expiration (5 minutes). R2 supports objects up to >5 TiB.
+- **Metadata:** stored as a small JSON sidecar (`.meta.json`) next to each artifact
+  in the bucket. There is no database to back up.
+- **Retention:** objects live in your bucket until you delete them via `kvcdn delete`.
+- **Concurrent uploads:** each upload is independent; the backend does not throttle.
+- **Authentication:** every API call requires a valid OIDC access token or an
+  org-scoped `kv_`-prefixed API key derived from `KVCDN_API_KEY_SEED`.
+- **Artifact isolation:** each artifact is stored under a per-customer prefix in
+  the bucket. One customer cannot list, download, or delete another customer's
+  artifacts, even if they know the artifact ID.
+
+## License
+
+This project is licensed under the [kvcdn-cli Source-Available License](LICENSE).
+
+The Software is provided for personal, educational, research and non-commercial
+evaluation purposes only. All commercial use and all commercial derivative works
+based on this source code are strictly prohibited. You may not sell, offer as a
+service, or incorporate this Software or any derivative work into a commercial
+product or business operation. See the full license text for details.

@@ -5,13 +5,13 @@ use anyhow::{Context, Result};
 use candle_core::DType;
 
 use crate::cli::QuantArgs;
-use crate::continue_mod::generate;
-use crate::kv_io;
-use crate::kv_quant::{max_quant_error, quantize_kv};
-use crate::model::{load_model, load_model_on, resolve_revision};
-use crate::output::{ensure_kv_extension, resolve_output_path};
-use crate::prefill::prefill;
-use crate::tokenize::{context_of_length, encode};
+use crate::core::output::{ensure_kv_extension, resolve_output_path};
+use crate::local::continuation::generate;
+use crate::local::kv_io;
+use crate::local::kv_quant::{max_quant_error, quantize_kv};
+use crate::local::prefill::prefill;
+use crate::local::tokenize::{context_of_length, encode};
+use crate::models::engine::{load_model, load_model_on, resolve_revision};
 
 pub fn run(args: QuantArgs) -> Result<()> {
     let revision = resolve_revision(args.revision.as_deref());

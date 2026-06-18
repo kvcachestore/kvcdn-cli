@@ -1,37 +1,9 @@
-mod admin;
-mod api;
-mod api_key;
-mod benchmark;
-mod callback_server;
 mod cli;
-mod common;
 mod config;
-mod continue_mod;
-mod credential_store;
-mod crypto;
-mod delete;
-mod diag;
-mod download;
-mod http;
-mod kv_io;
-mod kv_quant;
-mod list;
-mod login;
-mod logout;
-mod model;
+mod core;
+mod hosted;
+mod local;
 mod models;
-mod oidc;
-mod output;
-mod plot;
-mod prefill;
-mod quant;
-mod quota;
-mod token_store;
-mod tokenize;
-mod transfer;
-mod upload;
-mod verify;
-mod whoami;
 
 use anyhow::Result;
 use clap::Parser;
@@ -78,40 +50,40 @@ enum Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli {
-        Cli::Verify(args) => verify::run(args),
-        Cli::Diag(args) => diag::run(args),
-        Cli::Benchmark(args) => benchmark::run(args),
-        Cli::Plot(args) => plot::run(
+        Cli::Verify(args) => local::verify::run(args),
+        Cli::Diag(args) => local::diag::run(args),
+        Cli::Benchmark(args) => local::benchmark::run(args),
+        Cli::Plot(args) => local::plot::run(
             args.csv_path.as_deref(),
             args.out.as_deref(),
             args.max_n,
             &args.model,
         ),
-        Cli::Quant(args) => quant::run(args),
-        Cli::Login(args) => login::run(args),
-        Cli::Logout(args) => logout::run(args),
+        Cli::Quant(args) => local::quant::run(args),
+        Cli::Login(args) => hosted::login::run(args),
+        Cli::Logout(args) => hosted::logout::run(args),
         Cli::ApiKey(args) => match args.command {
-            cli::ApiKeyCommand::Set { key } => api_key::set(key),
+            cli::ApiKeyCommand::Set { key } => hosted::api_key::set(key),
             cli::ApiKeyCommand::Verify {
                 api_key,
                 api_url,
                 org,
                 project,
-            } => api_key::verify(api_key, api_url, org, project),
-            cli::ApiKeyCommand::Clear => api_key::clear(),
+            } => hosted::api_key::verify(api_key, api_url, org, project),
+            cli::ApiKeyCommand::Clear => hosted::api_key::clear(),
         },
-        Cli::Upload(args) => upload::run(args),
-        Cli::List(args) => list::run(args),
-        Cli::Download(args) => download::run(args),
-        Cli::Delete(args) => delete::run(args),
-        Cli::Quota(args) => quota::run(args),
-        Cli::Whoami(args) => whoami::run(args),
+        Cli::Upload(args) => hosted::upload::run(args),
+        Cli::List(args) => hosted::list::run(args),
+        Cli::Download(args) => hosted::download::run(args),
+        Cli::Delete(args) => hosted::delete::run(args),
+        Cli::Quota(args) => hosted::quota::run(args),
+        Cli::Whoami(args) => hosted::whoami::run(args),
         Cli::Admin(args) => match args.command {
             cli::AdminCommand::MintApiKey {
                 org,
                 api_url,
                 admin_secret,
-            } => admin::mint_api_key(org, api_url, admin_secret),
+            } => hosted::admin::mint_api_key(org, api_url, admin_secret),
         },
     }
 }

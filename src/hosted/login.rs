@@ -1,11 +1,11 @@
-use crate::callback_server::CallbackServer;
 use crate::config::Config;
-use crate::crypto;
-use crate::oidc::{
+use crate::core::crypto;
+use crate::hosted::callback_server::CallbackServer;
+use crate::hosted::oidc::{
     Pkce, build_authorization_url, discover, exchange_code, initiate_device_auth,
     poll_device_token, random_state,
 };
-use crate::token_store::{TokenStore, Tokens};
+use crate::hosted::token_store::{TokenStore, Tokens};
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -40,7 +40,7 @@ pub fn run(args: crate::cli::LoginArgs) -> Result<()> {
 }
 
 fn login_device_code(
-    oidc: &crate::oidc::OidcConfig,
+    oidc: &crate::hosted::oidc::OidcConfig,
     client_id: &str,
     no_browser: bool,
 ) -> Result<Tokens> {
@@ -78,7 +78,7 @@ fn login_device_code(
 }
 
 fn login_authorization_code(
-    oidc: &crate::oidc::OidcConfig,
+    oidc: &crate::hosted::oidc::OidcConfig,
     client_id: &str,
     no_browser: bool,
 ) -> Result<Tokens> {

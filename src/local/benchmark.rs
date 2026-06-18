@@ -5,10 +5,10 @@ use anyhow::{Context, Result};
 use candle_core::{DType, Tensor};
 
 use crate::cli::BenchmarkArgs;
-use crate::model::{load_model, load_model_on, resolve_revision};
+use crate::core::output::{atomic_write, resolve_output_path};
+use crate::local::tokenize::{context_of_length, encode};
 use crate::models::ModelConfig;
-use crate::output::{atomic_write, resolve_output_path};
-use crate::tokenize::{context_of_length, encode};
+use crate::models::engine::{load_model, load_model_on, resolve_revision};
 
 fn median(mut xs: Vec<f64>) -> f64 {
     xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -59,7 +59,7 @@ fn approx_prefill_flops(tokens: usize, cfg: &ModelConfig) -> f64 {
 }
 
 fn time_full_prefill(
-    bundle: &mut crate::model::ModelBundle,
+    bundle: &mut crate::models::engine::ModelBundle,
     tokens: &[u32],
     reps: usize,
 ) -> Result<f64> {
@@ -82,14 +82,17 @@ fn time_full_prefill(
 }
 
 /// One forward step over a resident KV cache (single continuation token).
-fn one_resident_step(bundle: &mut crate::model::ModelBundle, ctx_len: usize) -> Result<()> {
+fn one_resident_step(
+    bundle: &mut crate::models::engine::ModelBundle,
+    ctx_len: usize,
+) -> Result<()> {
     let input = Tensor::new(&[0u32], &bundle.device)?.unsqueeze(0)?;
     let _ = bundle.model.forward(&input, ctx_len)?;
     Ok(())
 }
 
 fn time_kv_continuation(
-    bundle: &mut crate::model::ModelBundle,
+    bundle: &mut crate::models::engine::ModelBundle,
     ctx_tokens: &[u32],
     reps: usize,
 ) -> Result<f64> {

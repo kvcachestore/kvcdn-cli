@@ -390,7 +390,7 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("q_artifact.safetensors");
         let cache = make_cache(2, 11);
-        let quantized = crate::kv_quant::quantize_kv(&cache)?;
+        let quantized = crate::local::kv_quant::quantize_kv(&cache)?;
         let saved = save_quantized_kv(&quantized, &path, "q-model", DType::F16)?;
         assert_eq!(saved.num_layers, 2);
         assert_eq!(saved.num_tokens, 11);
@@ -437,7 +437,7 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("legacy_q.safetensors");
         let cache = make_cache(2, 7);
-        let quantized = crate::kv_quant::quantize_kv(&cache)?;
+        let quantized = crate::local::kv_quant::quantize_kv(&cache)?;
         let tensors: HashMap<String, Tensor> = quantized
             .iter()
             .enumerate()

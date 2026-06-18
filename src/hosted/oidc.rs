@@ -1,4 +1,4 @@
-use crate::token_store::Tokens;
+use crate::hosted::token_store::Tokens;
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{Duration as ChronoDuration, Utc};
@@ -35,11 +35,11 @@ pub fn discover(issuer_url: &str) -> Result<OidcConfig> {
         "{}/.well-known/openid-configuration",
         issuer_url.trim_end_matches('/')
     );
-    let client = crate::http::Client::default_timeout()?;
+    let client = crate::hosted::http::Client::default_timeout()?;
     let resp = client
         .get(&url)
         .with_context(|| format!("fetching OIDC discovery from {url}"))?;
-    let resp = crate::http::Client::require_success(resp, &url)?;
+    let resp = crate::hosted::http::Client::require_success(resp, &url)?;
     resp.json().context("parsing OIDC discovery document")
 }
 
@@ -75,7 +75,7 @@ pub fn initiate_device_auth(
         .as_ref()
         .context("issuer does not advertise a device authorization endpoint")?;
 
-    let client = crate::http::Client::default_timeout()?;
+    let client = crate::hosted::http::Client::default_timeout()?;
     let resp = client
         .post_form(
             endpoint,
@@ -103,7 +103,7 @@ pub fn poll_device_token(
     interval_secs: u64,
     expires_in_secs: u64,
 ) -> Result<Tokens> {
-    let client = crate::http::Client::default_timeout()?;
+    let client = crate::hosted::http::Client::default_timeout()?;
     let params = [
         ("grant_type", DEVICE_CODE_GRANT),
         ("device_code", device_code),
@@ -239,7 +239,7 @@ pub fn exchange_code(
     params.insert("redirect_uri", redirect_uri);
     params.insert("code_verifier", &pkce.verifier);
 
-    let client = crate::http::Client::default_timeout()?;
+    let client = crate::hosted::http::Client::default_timeout()?;
     let resp = client
         .post_form(&cfg.token_endpoint, &params)
         .context("POST to token endpoint")?;

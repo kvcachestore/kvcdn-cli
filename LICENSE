@@ -1,6 +1,6 @@
 kvcdn-cli Source-Available License
 
-Copyright © 2026 kvcdn-cli contributors
+Copyright © 2026 KVCache Store LLC
 
 1. Grant of Rights
 
@@ -11,25 +11,29 @@ conditions below.
 
 2. Permitted Uses
 
-You may use, copy, modify, and distribute the Software only for:
-  - personal, educational, or research purposes;
-  - non-commercial evaluation and experimentation;
-  - contribution of improvements back to the original repository under the same
-    license.
+You may use, copy, modify, and distribute the Software for any lawful purpose,
+including personal, educational, research, and commercial use, provided that
+you comply with the restrictions in Section 3.
 
-3. Commercial Use and Derivative Works Prohibited
+3. Competing Hosted Service Restriction
 
 You may NOT:
-  - sell, rent, lease, sublicense, or otherwise commercialize the Software or
-    any derivative work based on it;
-  - use the Software or any derivative work in any commercial product, service,
-    or internal business operation;
-  - offer the Software or any derivative work as a hosted or managed service,
-    whether for payment or free of charge;
-  - incorporate the Software or any part of it into a product or service that
-    is distributed or made available to third parties in exchange for payment,
-    data, or any other consideration;
-  - create derivative works of the Software for any commercial purpose.
+  - offer the Software or any derivative work as a hosted or managed
+    KV-cache storage, sharing, or serving service that competes with the
+    KVCache Store hosted service;
+  - operate the Software or any derivative work as a multi-tenant SaaS, PaaS,
+    or cloud service whose primary purpose is storing, serving, or sharing
+    KV caches on behalf of third parties, whether for payment or free of
+    charge.
+
+This restriction does not prohibit:
+  - using the Software to generate, verify, quantize, or share KV caches
+    within your own organization or infrastructure;
+  - embedding the Software or its outputs into a larger product or service
+    where KV-cache sharing is not the primary offering;
+  - selling support, consulting, or professional services related to the
+    Software;
+  - redistributing the Software under this license.
 
 A "derivative work" includes any modification, translation, abridgment,
 condensation, expansion, or any other form in which the Software is recast,
@@ -38,7 +42,7 @@ substantial portion of the Software.
 
 4. Distribution of Derivative Works
 
-Any non-commercial derivative work that you distribute must:
+Any derivative work that you distribute must:
   - include this license in full;
   - include the original copyright notice;
   - clearly document every change made to the Software;
