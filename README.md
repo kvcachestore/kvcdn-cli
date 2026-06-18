@@ -106,7 +106,7 @@ For this deployment the OIDC provider is exposed at `https://<your-issuer>`. If 
 
 - `KVCDN_S3_BUCKETS` — comma-separated list of S3-compatible bucket names (e.g. `kvcdn-artifacts-1,kvcdn-artifacts-2`). Tenants are deterministically assigned to one bucket. If only one bucket is configured, behavior is identical to the original single-bucket setup.
 - `KVCDN_S3_BUCKET` — legacy single-bucket name. Used as a fallback if `KVCDN_S3_BUCKETS` is not set.
-- `KVCDN_CONTROL_BUCKET` — bucket that stores tenant-to-bucket assignment records. This bucket should be created in the same S3 account/endpoint and is required when `KVCDN_S3_BUCKETS` has more than one entry. See `docs/ops/multi-bucket-runbook.md` for migration steps.
+- `KVCDN_CONTROL_BUCKET` — bucket that stores tenant-to-bucket assignment records. This bucket should be created in the same S3 account/endpoint and is required when `KVCDN_S3_BUCKETS` has more than one entry.
 - `KVCDN_ISSUER_URL` — OIDC issuer URL for the Pocket ID (or other OpenID Connect) provider used to authenticate CLI users.
 - `KVCDN_CLIENT_ID` — OIDC client ID the CLI presents to the issuer. This must match a public/PKCE client registered in your OIDC provider.
 - `KVCDN_API_KEY_SEED` — master secret used to derive organization-scoped API keys with HKDF-SHA256. Generate once with `openssl rand -hex 32` and keep it secret; changing it invalidates all existing API keys.
@@ -152,10 +152,6 @@ evaluation purposes only. All commercial use and all commercial derivative works
 based on this source code are strictly prohibited. You may not sell, offer as a
 service, or incorporate this Software or any derivative work into a commercial
 product or business operation. See the full license text for details.
-
-## Local Kubernetes stack (optional)
-
-A self-contained local stack is available under `deploy/local/` for manual integration testing. It is **not required** for day-to-day development; the unit and integration tests above run without it. See `deploy/local/README.md` for setup, manual steps, and troubleshooting.
 
 ## Model support
 
