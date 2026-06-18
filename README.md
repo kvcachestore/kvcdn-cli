@@ -241,6 +241,29 @@ builds and strips an x86-64 Linux binary, packages it as
 Trivy. If `COSIGN_PRIVATE_KEY` is provided, it also produces cosign signatures
 (`.sig` files).
 
+### Runtime requirements
+
+The released Linux binary is built on `debian:bookworm` (glibc 2.36+) and links
+dynamically against a few system libraries. It should run on most recent
+Debian, Ubuntu, Fedora, and other glibc-based distributions. Before running it,
+you can check that the required shared libraries are present:
+
+```bash
+ldd kvcdn-x86_64-unknown-linux-gnu
+```
+
+Typical dynamic dependencies include:
+
+- `libc.so.6`
+- `libssl.so.3` and `libcrypto.so.3`
+- `libz.so.1`
+- `libstdc++.so.6`, `libgcc_s.so.1`, `libm.so.6`
+
+If your system ships OpenSSL 1.x instead of OpenSSL 3.x, or an older glibc, the
+binary will fail to start. In that case, build from source (`cargo build --release`)
+or run the Dagger pipeline on a host whose libraries match your target
+environment.
+
 ### Release build
 
 Build and export the release binary locally using the Dagger module:
