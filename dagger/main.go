@@ -116,40 +116,38 @@ func (m *Kvcdn) Pr(ctx context.Context, src *dagger.Directory) error {
 	)
 }
 
+const binaryName = "kvcdn-x86_64-unknown-linux-gnu"
+
 // Build compiles the kvcdn release binary, strips it, and returns the directory
-// containing the packaged artifact.
+// containing the raw binary.
 func (m *Kvcdn) Build(ctx context.Context, src *dagger.Directory) (*dagger.Directory, error) {
 	builder := rustBuilder(src, "release").
 		WithExec([]string{"cargo", "build", "--release", "--locked"}).
-		WithExec([]string{"cp", "/src/target/release/kvcdn", "/tmp/kvcdn"}).
-		WithExec([]string{"strip", "/tmp/kvcdn"}).
-		WithExec([]string{"sh", "-c", "mkdir -p /out && cp /tmp/kvcdn /out/kvcdn-x86_64-unknown-linux-gnu && tar -czf /out/kvcdn-x86_64-unknown-linux-gnu.tar.gz -C /out kvcdn-x86_64-unknown-linux-gnu"})
+		WithExec([]string{"cp", "/src/target/release/kvcdn", "/tmp/" + binaryName}).
+		WithExec([]string{"strip", "/tmp/" + binaryName}).
+		WithExec([]string{"sh", "-c", "mkdir -p /out && cp /tmp/" + binaryName + " /out/" + binaryName})
 
 	return builder.Directory("/out"), nil
 }
 
-// Sbom generates a SPDX JSON SBOM for the release tarball.
+// Sbom generates a SPDX JSON SBOM for the release binary.
 func (m *Kvcdn) Sbom(ctx context.Context, artifact *dagger.File) (*dagger.File, error) {
 	out, err := dag.Container().
 		From(syftImage).
-		WithFile("/input.tar.gz", artifact).
-		WithExec([]string{"/syft", "/input.tar.gz", "-o", "spdx-json=/out/kvcdn-x86_64-unknown-linux-gnu.sbom.json"}).
-		File("/out/kvcdn-x86_64-unknown-linux-gnu.sbom.json").
+		WithFile("/input/"+binaryName, artifact).
+		WithWorkdir("/input").
+		WithExec([]string{"/syft", binaryName, "-o", "spdx-json=/out/" + binaryName + ".sbom.json"}).
+		File("/out/" + binaryName + ".sbom.json").
 		Sync(ctx)
 	return out, err
 }
 
-// Scan extracts the release tarball and runs Trivy against the contents,
-// failing on CRITICAL/HIGH CVEs or secrets.
+// Scan runs Trivy against the release binary, failing on CRITICAL/HIGH CVEs or secrets.
 func (m *Kvcdn) Scan(ctx context.Context, artifact *dagger.File) error {
 	_, err := dag.Container().
 		From(trivyImage).
-		WithFile("/input/kvcdn-x86_64-unknown-linux-gnu.tar.gz", artifact).
+		WithFile("/input/"+binaryName, artifact).
 		WithWorkdir("/input").
-		WithExec([]string{
-			"sh", "-c",
-			"tar -xzf kvcdn-x86_64-unknown-linux-gnu.tar.gz && rm kvcdn-x86_64-unknown-linux-gnu.tar.gz",
-		}).
 		WithExec([]string{
 			"trivy", "fs", "--severity", "CRITICAL,HIGH",
 			"--exit-code", "1", "--no-progress",
@@ -159,7 +157,7 @@ func (m *Kvcdn) Scan(ctx context.Context, artifact *dagger.File) error {
 	return err
 }
 
-// Sign signs the release tarball and its SBOM with cosign using the provided
+// Sign signs the release binary and its SBOM with cosign using the provided
 // private key secret. The key secret should be a cosign private key.
 // It returns a directory containing the two .sig files.
 func (m *Kvcdn) Sign(
@@ -168,19 +166,16 @@ func (m *Kvcdn) Sign(
 	sbom *dagger.File,
 	cosignKey *dagger.Secret,
 ) (*dagger.Directory, error) {
-	const (
-		tarballName = "kvcdn-x86_64-unknown-linux-gnu.tar.gz"
-		sbomName    = "kvcdn-x86_64-unknown-linux-gnu.sbom.json"
-	)
+	const sbomName = binaryName + ".sbom.json"
 
 	signer := dag.Container().
 		From(cosignImage).
-		WithFile("/artifacts/"+tarballName, artifact).
+		WithFile("/artifacts/"+binaryName, artifact).
 		WithFile("/artifacts/"+sbomName, sbom).
 		WithSecretVariable("COSIGN_PASSWORD", dag.SetSecret("cosign-password", "")).
 		WithSecretVariable("COSIGN_PRIVATE_KEY", cosignKey).
 		WithWorkdir("/artifacts").
-		WithExec([]string{"cosign", "sign-blob", "--key", "env://COSIGN_PRIVATE_KEY", "--yes", tarballName}).
+		WithExec([]string{"cosign", "sign-blob", "--key", "env://COSIGN_PRIVATE_KEY", "--yes", binaryName}).
 		WithExec([]string{"cosign", "sign-blob", "--key", "env://COSIGN_PRIVATE_KEY", "--yes", sbomName})
 
 	if _, err := signer.Sync(ctx); err != nil {
@@ -189,14 +184,14 @@ func (m *Kvcdn) Sign(
 	return signer.Directory("/artifacts"), nil
 }
 
-// Release runs PR checks, builds the release tarball, generates an SBOM,
+// Release runs PR checks, builds the release binary, generates an SBOM,
 // scans for vulnerabilities, and optionally signs artifacts if a cosign key is
-// provided. It returns a directory containing the tarball, SBOM, signatures,
+// provided. It returns a directory containing the binary, SBOM, signatures,
 // and the extracted binary.
 func (m *Kvcdn) Release(
 	ctx context.Context,
 	src *dagger.Directory,
-	// Cosign private key secret for signing the tarball and SBOM.
+	// Cosign private key secret for signing the binary and SBOM.
 	// +optional
 	cosignKey *dagger.Secret,
 ) (*dagger.Directory, error) {
@@ -209,27 +204,27 @@ func (m *Kvcdn) Release(
 		return nil, fmt.Errorf("build: %w", err)
 	}
 
-	tarball := out.File("kvcdn-x86_64-unknown-linux-gnu.tar.gz")
+	binary := out.File(binaryName)
 
 	var sbomFile *dagger.File
 	var scanErr error
 	if err := errgroup(
 		func() error {
-			sbomFile, err = m.Sbom(ctx, tarball)
+			sbomFile, err = m.Sbom(ctx, binary)
 			return err
 		},
 		func() error {
-			scanErr = m.Scan(ctx, tarball)
+			scanErr = m.Scan(ctx, binary)
 			return scanErr
 		},
 	); err != nil {
 		return nil, fmt.Errorf("sbom/scan: %w", err)
 	}
 
-	out = out.WithFile("kvcdn-x86_64-unknown-linux-gnu.sbom.json", sbomFile)
+	out = out.WithFile(binaryName+".sbom.json", sbomFile)
 
 	if cosignKey != nil {
-		sigs, err := m.Sign(ctx, tarball, sbomFile, cosignKey)
+		sigs, err := m.Sign(ctx, binary, sbomFile, cosignKey)
 		if err != nil {
 			return nil, fmt.Errorf("sign: %w", err)
 		}

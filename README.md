@@ -15,6 +15,20 @@ kvcdn makes that work reusable. It lets you:
 
 In short, kvcdn turns the long-context prefill problem into a cache-and-serve problem. A practical application is an inference service that lets clients supply a KVCDN artifact reference; the service fetches and loads the prefill cache dynamically, then runs continuation generation against the cached context without repeating the expensive prefill.
 
+## Install
+
+Download the release binary for Linux x86-64 from the [v0.1.0 release page](https://github.com/kvcachestore/kvcdn-cli/releases/tag/v0.1.0):
+
+```bash
+curl -L -o kvcdn \
+  https://github.com/kvcachestore/kvcdn-cli/releases/download/v0.1.0/kvcdn-x86_64-unknown-linux-gnu
+chmod +x kvcdn
+sudo mv kvcdn /usr/local/bin/kvcdn
+kvcdn --help
+```
+
+To build from source instead, see the [Build](#build) section.
+
 ## Commands
 
 - `kvcdn verify` — verify that loading a saved KV cache produces token-exact output.
@@ -154,11 +168,11 @@ cargo build --release
 ```
 
 The Dagger pipeline runs Rust and backend lint/test checks in parallel, then
-builds and strips an x86-64 Linux binary, packages it as
-`dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz`, generates an SPDX SBOM
-(`dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json`), and scans the tarball with
-Trivy. If `COSIGN_PRIVATE_KEY` is provided, it also produces cosign signatures
-(`.sig` files).
+builds and strips an x86-64 Linux binary
+(`dist/kvcdn-x86_64-unknown-linux-gnu`), generates an SPDX SBOM
+(`dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json`), and scans the binary with
+Trivy. If `COSIGN_PRIVATE_KEY` is provided, it also produces a cosign signature
+(`dist/kvcdn-x86_64-unknown-linux-gnu.sig`).
 
 ### Runtime requirements
 
@@ -201,13 +215,12 @@ dagger call -m dagger release --src=. export --path=./dist
 dagger call -m dagger release --src=. --cosign-key=env:COSIGN_PRIVATE_KEY export --path=./dist
 ```
 
-The packaged artifact is written to:
-`dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz`
+The release binary and supporting artifacts are written to `./dist/`:
 
-Additional artifacts when signing is enabled:
-- `dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json` — SPDX SBOM
-- `dist/kvcdn-x86_64-unknown-linux-gnu.tar.gz.sig` — tarball cosign signature
-- `dist/kvcdn-x86_64-unknown-linux-gnu.sbom.json.sig` — SBOM cosign signature
+- `kvcdn-x86_64-unknown-linux-gnu` — stripped Linux x86-64 release binary
+- `kvcdn-x86_64-unknown-linux-gnu.sbom.json` — SPDX SBOM
+- `kvcdn-x86_64-unknown-linux-gnu.sig` — binary cosign signature (when `COSIGN_PRIVATE_KEY` is set)
+- `kvcdn-x86_64-unknown-linux-gnu.sbom.json.sig` — SBOM cosign signature (when `COSIGN_PRIVATE_KEY` is set)
 
 ## Limits
 
@@ -229,8 +242,8 @@ The backend is designed around presigned S3 URLs and stateless metadata:
 
 This project is licensed under the [kvcdn-cli Source-Available License](LICENSE).
 
-The Software is provided for personal, educational, research and non-commercial
-evaluation purposes only. All commercial use and all commercial derivative works
-based on this source code are strictly prohibited. You may not sell, offer as a
-service, or incorporate this Software or any derivative work into a commercial
-product or business operation. See the full license text for details.
+You may use, copy, modify, and distribute the Software for any lawful purpose,
+including commercial use. The only restriction is that you may not operate the
+Software, or a derivative work, as a hosted or managed KV-cache storage, sharing,
+or serving service that competes with the KVCache Store hosted service. See the
+full license text for details.
