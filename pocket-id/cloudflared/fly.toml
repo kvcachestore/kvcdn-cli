@@ -1,0 +1,11 @@
+app = "kvcachestore-pocket-id-cloudflared"
+primary_region = "iad"
+
+[build]
+  image = "cloudflare/cloudflared:latest"
+
+[env]
+  TUNNEL_TRANSPORT_PROTOCOL = "http2"
+
+[processes]
+  app = "tunnel --no-autoupdate run"

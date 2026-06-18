@@ -7,8 +7,10 @@ use candle_core::{DType, Device, Module, Result, Tensor};
 use candle_nn::{Activation, Linear, RmsNorm, VarBuilder, linear_b, linear_no_bias};
 use std::sync::Arc;
 
+use crate::models::{CausalLM, KVCache, ModelConfig};
+
 #[derive(Debug, Clone, PartialEq, serde::Deserialize)]
-pub struct Config {
+pub(crate) struct Config {
     pub vocab_size: usize,
     pub hidden_size: usize,
     pub intermediate_size: usize,
@@ -25,6 +27,13 @@ pub struct Config {
     pub rms_norm_eps: f64,
     pub use_sliding_window: bool,
     pub hidden_act: Activation,
+}
+
+impl Config {
+    pub(crate) fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+        let bytes = std::fs::read(path)?;
+        serde_json::from_slice(&bytes).map_err(|e| candle_core::Error::Msg(e.to_string()))
+    }
 }
 
 /// GQA: repeat key/value heads to match query heads.
@@ -101,8 +110,6 @@ impl Module for Qwen3MLP {
         (lhs * rhs)?.apply(&self.down_proj)
     }
 }
-
-pub type KVCache = Vec<(Tensor, Tensor)>;
 
 #[derive(Debug, Clone)]
 struct Qwen3Attention {
@@ -299,6 +306,7 @@ pub struct Model {
     norm: RmsNorm,
     device: Device,
     dtype: DType,
+    config: Config,
 }
 
 impl Model {
@@ -317,7 +325,12 @@ impl Model {
             norm: candle_nn::rms_norm(cfg.hidden_size, cfg.rms_norm_eps, vb.pp("model.norm"))?,
             device: vb.device().clone(),
             dtype: vb.dtype(),
+            config: cfg.clone(),
         })
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     fn clear_kv_cache(&mut self) {
@@ -365,27 +378,30 @@ impl Model {
         self.norm.forward(&h)
     }
 
-    pub fn get_kv_cache(&self) -> KVCache {
+    pub fn get_kv_cache(&self) -> Result<KVCache> {
         self.layers
             .iter()
             .map(|l| {
-                l.self_attn
-                    .get_kv_cache()
-                    .unwrap_or_else(|| panic!("get_kv_cache called before any forward pass"))
+                l.self_attn.get_kv_cache().ok_or_else(|| {
+                    candle_core::Error::Msg("get_kv_cache called before any forward pass".into())
+                })
             })
-            .collect()
+            .collect::<Result<Vec<_>>>()
     }
 
-    pub fn set_kv_cache(&mut self, cache: KVCache) {
-        assert_eq!(cache.len(), self.layers.len());
+    pub fn set_kv_cache(&mut self, cache: KVCache) -> Result<()> {
+        if cache.len() != self.layers.len() {
+            candle_core::bail!(
+                "KV cache layer count mismatch: expected {}, got {}",
+                self.layers.len(),
+                cache.len()
+            );
+        }
+
         for (layer, (k, v)) in self.layers.iter_mut().zip(cache) {
             layer.self_attn.set_kv_cache(k, v);
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn num_layers(&self) -> usize {
-        self.layers.len()
+        Ok(())
     }
 }
 
@@ -401,7 +417,7 @@ impl ModelForCausalLM {
         let lm_head = if cfg.tie_word_embeddings {
             Linear::new(base.embed_tokens.embeddings().clone(), None)
         } else {
-            linear_no_bias(cfg.vocab_size, cfg.hidden_size, vb.pp("lm_head"))?
+            linear_no_bias(cfg.hidden_size, cfg.vocab_size, vb.pp("lm_head"))?
         };
         Ok(Self { base, lm_head })
     }
@@ -418,16 +434,45 @@ impl ModelForCausalLM {
         self.base.clear_kv_cache();
     }
 
-    pub fn get_kv_cache(&self) -> KVCache {
+    pub fn get_kv_cache(&self) -> Result<KVCache> {
         self.base.get_kv_cache()
     }
 
-    pub fn set_kv_cache(&mut self, cache: KVCache) {
-        self.base.set_kv_cache(cache);
+    pub fn set_kv_cache(&mut self, cache: KVCache) -> Result<()> {
+        self.base.set_kv_cache(cache)
+    }
+}
+
+fn to_model_config(cfg: &Config) -> ModelConfig {
+    ModelConfig {
+        vocab_size: cfg.vocab_size,
+        hidden_size: cfg.hidden_size,
+        intermediate_size: cfg.intermediate_size,
+        num_hidden_layers: cfg.num_hidden_layers,
+        num_attention_heads: cfg.num_attention_heads,
+        head_dim: cfg.head_dim,
+        num_key_value_heads: cfg.num_key_value_heads,
+    }
+}
+
+impl CausalLM for ModelForCausalLM {
+    fn forward(&mut self, input: &Tensor, offset: usize) -> Result<Tensor> {
+        self.forward(input, offset)
     }
 
-    #[allow(dead_code)]
-    pub fn num_layers(&self) -> usize {
-        self.base.num_layers()
+    fn clear_kv_cache(&mut self) {
+        self.clear_kv_cache()
+    }
+
+    fn get_kv_cache(&self) -> Result<KVCache> {
+        self.get_kv_cache()
+    }
+
+    fn set_kv_cache(&mut self, cache: KVCache) -> Result<()> {
+        self.set_kv_cache(cache)
+    }
+
+    fn config(&self) -> ModelConfig {
+        to_model_config(self.base.config())
     }
 }

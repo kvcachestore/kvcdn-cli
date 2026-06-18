@@ -15,6 +15,7 @@ data/*.txt
 arxiv-*.zip
 *.incomplete
 .venv/
+.env
 
 # latex build artifacts
 paper/*.aux
@@ -28,3 +29,12 @@ paper/*.synctex.gz
 # Added by cargo
 
 /target
+.worktrees/
+
+# Local kind cluster config
+.kind/
+
+# Backend build/runtime artifacts
+backend/node_modules/
+backend/dist/
+.omo/

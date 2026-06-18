@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kvcdn-api-config
+  namespace: kvcdn
+data:
+  KVCDN_API_PORT: "3000"
+  # Issuer URL the CLI sees via kubectl port-forward. Must match the host:port
+  # used by the e2e script and any local user running `kvcdn login`.
+  KVCDN_ISSUER_URL: "http://localhost:8080/oidc"
+  KVCDN_CLIENT_ID: "kvcdn-cli"
+  KVCDN_S3_ENDPOINT: "http://minio.storage.svc.cluster.local:9000"
+  KVCDN_S3_BUCKET: "artifacts"
+  KVCDN_S3_BUCKETS: "artifacts"
+  KVCDN_CONTROL_BUCKET: "kvcdn-control"
+  KVCDN_S3_REGION: "us-east-1"
+  KVCDN_S3_FORCE_PATH_STYLE: "true"
+  # The local stack uses the backend's built-in mock OIDC provider. Set this so
+  # auth.ts validates tokens with the mock key pair instead of fetching a
+  # remote JWKS, while still advertising KVCDN_ISSUER_URL to the CLI.
+  KVCDN_MOCK_OIDC: "true"
+  KVCDN_OIDC_SUB: "user@kvcdn.local"

@@ -1,0 +1,79 @@
+kvcdn-cli Source-Available License
+
+Copyright © 2026 kvcdn-cli contributors
+
+1. Grant of Rights
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, and distribute copies of the Software, subject to the
+conditions below.
+
+2. Permitted Uses
+
+You may use, copy, modify, and distribute the Software only for:
+  - personal, educational, or research purposes;
+  - non-commercial evaluation and experimentation;
+  - contribution of improvements back to the original repository under the same
+    license.
+
+3. Commercial Use and Derivative Works Prohibited
+
+You may NOT:
+  - sell, rent, lease, sublicense, or otherwise commercialize the Software or
+    any derivative work based on it;
+  - use the Software or any derivative work in any commercial product, service,
+    or internal business operation;
+  - offer the Software or any derivative work as a hosted or managed service,
+    whether for payment or free of charge;
+  - incorporate the Software or any part of it into a product or service that
+    is distributed or made available to third parties in exchange for payment,
+    data, or any other consideration;
+  - create derivative works of the Software for any commercial purpose.
+
+A "derivative work" includes any modification, translation, abridgment,
+condensation, expansion, or any other form in which the Software is recast,
+transformed, or adapted, as well as any work that includes or is built upon a
+substantial portion of the Software.
+
+4. Distribution of Derivative Works
+
+Any non-commercial derivative work that you distribute must:
+  - include this license in full;
+  - include the original copyright notice;
+  - clearly document every change made to the Software;
+  - be distributed under this same license without additional restrictions.
+
+5. Termination
+
+Any attempt to use, modify, or distribute the Software in violation of this
+license automatically terminates your rights under this license. If you
+violate this license and then cure the violation, your rights may be reinstated
+only if the copyright holders agree in writing.
+
+6. Disclaimer of Warranty and Limitation of Liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+INCLUDING BUT NOT LIMITED TO ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, REVENUE,
+INCOME, BUSINESS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Governing Law and Jurisdiction
+
+This license shall be governed by and construed in accordance with the laws of
+the State of Texas, United States of America, without regard to conflict-of-law
+principles. Any dispute arising under or relating to this license or the
+Software shall be brought exclusively in the state or federal courts located in
+Travis County, Texas, and the parties consent to the personal jurisdiction and
+venue of those courts.
+
+8. Entire Agreement
+
+This license constitutes the entire agreement concerning the Software. No
+amendment or waiver of any provision is binding unless in writing signed by
+the copyright holders.

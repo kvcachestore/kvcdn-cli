@@ -1,0 +1,15 @@
+app = "kvcachestore-pocket-id"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "production"
+  APP_URL = "https://<your-issuer>"
+  PORT = "1411"
+  TRUST_PROXY = "true"
+
+[[mounts]]
+  source = "pocket_id_data"
+  destination = "/app/backend/data"

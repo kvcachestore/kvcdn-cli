@@ -1,0 +1,33 @@
+# Standalone MinIO with no persistence for local development.
+mode: standalone
+replicas: 1
+
+rootUser: minioadmin
+rootPassword: minioadmin
+
+persistence:
+  enabled: false
+
+buckets:
+  - name: artifacts
+    policy: none
+    purge: false
+  - name: kvcdn-control
+    policy: none
+    purge: false
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+service:
+  type: ClusterIP
+  port: 9000
+
+consoleService:
+  type: ClusterIP
+  port: 9001

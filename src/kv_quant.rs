@@ -1,32 +1,27 @@
 use anyhow::{Context, Result};
 use candle_core::{DType, Tensor};
 
-use crate::qwen3_model::KVCache;
+use crate::models::KVCache;
 
-/// Per-(batch, head, token) affine quantization across the head dimension.
+/// Per-tensor symmetric int8 quantization.
 ///
-/// Returns `(scale, quantized)` where `quantized` has dtype `U8` and `scale`
-/// has dtype `F32` and can be broadcast back over the head dimension.
-/// Values are mapped to `[0, 255]` with a zero-point of `128`.
+/// Matches kvstore's `quantize_int8`: `scale = max(|t|) / 127` over the whole
+/// tensor, and values are rounded to `[-127, 127]`. Candle 0.10 does not
+/// expose `DType::I8`, so the signed values are stored in `U8` with a +128
+/// offset; the dequantizer recenters before scaling.
 pub fn quantize_tensor(t: &Tensor) -> Result<(Tensor, Tensor)> {
     let shape = t.shape();
     if shape.rank() != 4 {
         anyhow::bail!("expected rank-4 KV tensor, got shape {shape:?}");
     }
 
-    // Compute max absolute value per (batch, head, token).
     let f32_t = t.to_dtype(DType::F32)?;
     let abs = f32_t.abs()?;
-    let max = abs.max_keepdim(3)?; // keepdim so shape stays (B, H, T, 1)
-
-    // Guard against all-zero groups.
+    let max = abs.max_all()?;
     let scale = max.clamp(1e-12f64, f64::MAX)?;
 
     let normalized = (f32_t.broadcast_div(&scale)? * 127.0f64)?;
-    let q = (normalized
-        .round()?
-        .clamp(-127.0f64, 127.0f64)?
-        + 128.0f64)?;
+    let q = (normalized.round()?.clamp(-127.0f64, 127.0f64)? + 128.0f64)?;
     let q = q
         .to_dtype(DType::U8)
         .context("converting quantized values to U8")?;
@@ -34,7 +29,7 @@ pub fn quantize_tensor(t: &Tensor) -> Result<(Tensor, Tensor)> {
     Ok((scale, q))
 }
 
-/// Dequantize a U8 tensor back to the target dtype using the per-group scale.
+/// Dequantize a U8-stored symmetric int8 tensor back to the target dtype.
 pub fn dequantize_tensor(scale: &Tensor, q: &Tensor, target_dtype: DType) -> Result<Tensor> {
     let centered = (q.to_dtype(DType::F32)? - 128.0f64)?;
     let x = (centered.broadcast_mul(scale)? / 127.0f64)?;
@@ -55,24 +50,6 @@ pub fn quantize_kv(cache: &KVCache) -> Result<Vec<(Tensor, Tensor, Tensor, Tenso
             Ok((k_s, k_q, v_s, v_q))
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use candle_core::{Device, Tensor};
-
-    #[test]
-    fn round_trip_quantization() -> Result<()> {
-        let dev = Device::Cpu;
-        let t = Tensor::randn(0f32, 1f32, (1, 8, 32, 128), &dev)?;
-        let (scale, q) = quantize_tensor(&t)?;
-        let dq = dequantize_tensor(&scale, &q, DType::F32)?;
-        let err = (t - dq)?.abs()?.max_all()?.to_scalar::<f32>()?;
-        println!("max err {err}");
-        assert!(err < 0.02);
-        Ok(())
-    }
 }
 
 /// Compute the maximum absolute dequantization error for a cache.
@@ -96,4 +73,47 @@ pub fn max_quant_error(cache: &KVCache, target_dtype: DType) -> Result<f32> {
         max_err = max_err.max(err);
     }
     Ok(max_err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use candle_core::{Device, Tensor};
+
+    #[test]
+    fn round_trip_quantization() -> Result<()> {
+        let dev = Device::Cpu;
+        let len: usize = 8 * 32 * 128;
+        let deterministic_values = Tensor::arange(0u32, len as u32, &dev)?
+            .to_dtype(DType::F32)?
+            .reshape((1, 8, 32, 128))?;
+        let t =
+            (deterministic_values.broadcast_div(&Tensor::new((len / 2) as f32, &dev)?)? - 1.0f64)?;
+        let (scale, q) = quantize_tensor(&t)?;
+        let dq = dequantize_tensor(&scale, &q, DType::F32)?;
+        let err = (t - dq)?.abs()?.max_all()?.to_scalar::<f32>()?;
+        println!("max err {err}");
+        assert!(err < 0.02);
+        Ok(())
+    }
+
+    #[test]
+    fn round_trip_quantization_fp8() -> Result<()> {
+        let dev = Device::Cpu;
+        let len: usize = 8 * 32 * 128;
+        let deterministic_values = Tensor::arange(0u32, len as u32, &dev)?
+            .to_dtype(DType::F32)?
+            .reshape((1, 8, 32, 128))?;
+        let t =
+            (deterministic_values.broadcast_div(&Tensor::new((len / 2) as f32, &dev)?)? - 1.0f64)?;
+        let (scale, q) = quantize_tensor(&t)?;
+        let dq = dequantize_tensor(&scale, &q, DType::F8E4M3)?;
+        let err = (t.to_dtype(DType::F32)? - dq.to_dtype(DType::F32)?)?
+            .abs()?
+            .max_all()?
+            .to_scalar::<f32>()?;
+        println!("max err {err}");
+        assert!(err < 0.5);
+        Ok(())
+    }
 }
