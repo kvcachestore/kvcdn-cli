@@ -2,12 +2,84 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use candle_core::{DType, Device, Tensor};
 use serde::{Deserialize, Serialize};
 
 use crate::models::KVCache;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum QuantDtype {
+    Float(DType),
+    Int8,
+}
+
+impl QuantDtype {
+    fn as_str(&self) -> &'static str {
+        match self {
+            QuantDtype::Float(DType::F16) => "F16",
+            QuantDtype::Float(DType::F32) => "F32",
+            QuantDtype::Float(DType::BF16) => "BF16",
+            QuantDtype::Float(DType::F8E4M3) => "FP8",
+            QuantDtype::Int8 => "I8",
+            QuantDtype::Float(other) => panic!("unexpected QuantDtype float variant: {other:?}"),
+        }
+    }
+}
+
+impl Serialize for QuantDtype {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for QuantDtype {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        parse_quant_dtype(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl std::fmt::Display for QuantDtype {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for QuantDtype {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "F16" => Ok(QuantDtype::Float(DType::F16)),
+            "F32" => Ok(QuantDtype::Float(DType::F32)),
+            "BF16" => Ok(QuantDtype::Float(DType::BF16)),
+            "FP8" | "F8" | "F8E4M3" => Ok(QuantDtype::Float(DType::F8E4M3)),
+            "I8" => Ok(QuantDtype::Int8),
+            "U8" | "I4" | "U4" => anyhow::bail!(
+                "{s} is not supported as a target dtype; supported targets are F16, F32, BF16, FP8, and I8"
+            ),
+            "FP4" | "F4" => anyhow::bail!(
+                "{s} is not supported: candle-core 0.10 does not implement to_dtype(F4); implement custom 4-bit quantization to enable it"
+            ),
+            "FP1" => anyhow::bail!(
+                "{s} is not supported: there is no standard 1-bit floating-point dtype; use a custom 1-bit/sign quantization instead"
+            ),
+            other => anyhow::bail!("unsupported target dtype for quantized artifact: {other}"),
+        }
+    }
+}
+
+pub fn parse_quant_dtype(s: &str) -> Result<QuantDtype> {
+    s.parse::<QuantDtype>()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KVArtifact {
@@ -83,14 +155,14 @@ pub fn save_quantized_kv<P: AsRef<Path>>(
     layers: &[(Tensor, Tensor, Tensor, Tensor)],
     path: P,
     model_name: &str,
-    target_dtype: DType,
+    target_dtype: QuantDtype,
 ) -> Result<KVArtifact> {
     if layers.is_empty() {
         anyhow::bail!("cannot save empty quantized KV cache");
     }
     let num_layers = layers.len();
     let num_tokens = layers[0].1.dim(2)?;
-    let dtype = format!("{:?}", target_dtype);
+    let dtype = target_dtype.to_string();
     let storage_dtype = format!("{:?}", layers[0].1.dtype());
 
     let mut tensors: HashMap<String, Tensor> = HashMap::new();
@@ -150,10 +222,14 @@ pub fn load_kv<P: AsRef<Path>>(path: P, device: &Device) -> Result<(KVCache, KVA
 
             let target_dtype = meta
                 .as_ref()
-                .map(|m| parse_dtype(&m.dtype))
-                .unwrap_or(Ok(DType::F16))?;
-            let k = dequantize_tensor(k_s, k_q, target_dtype)?;
-            let v = dequantize_tensor(v_s, v_q, target_dtype)?;
+                .map(|m| parse_quant_dtype(&m.dtype))
+                .unwrap_or(Ok(QuantDtype::Float(DType::F16)))?;
+            let dequant_dtype = match target_dtype {
+                QuantDtype::Int8 => DType::F16,
+                QuantDtype::Float(dt) => dt,
+            };
+            let k = dequantize_tensor(k_s, k_q, dequant_dtype)?;
+            let v = dequantize_tensor(v_s, v_q, dequant_dtype)?;
             layers.push((k, v));
         }
     } else {
@@ -323,27 +399,6 @@ pub fn read_kv_metadata<P: AsRef<Path>>(path: P) -> Result<KVArtifact> {
     })
 }
 
-pub fn parse_dtype(s: &str) -> Result<DType> {
-    match s {
-        "F16" => Ok(DType::F16),
-        "F32" => Ok(DType::F32),
-        "BF16" => Ok(DType::BF16),
-        "FP8" | "F8" | "F8E4M3" => Ok(DType::F8E4M3),
-        "FP4" | "F4" => {
-            anyhow::bail!(
-                "{s} is not supported: candle-core 0.10 does not implement to_dtype(F4); implement custom 4-bit quantization to enable it"
-            )
-        }
-        "FP1" => anyhow::bail!(
-            "{s} is not supported: there is no standard 1-bit floating-point dtype; use a custom 1-bit/sign quantization instead"
-        ),
-        "I8" | "U8" | "I4" | "U4" => anyhow::bail!(
-            "{s} is not supported as a dequantization target; current storage is symmetric int8 (U8) and targets must be a float dtype"
-        ),
-        other => anyhow::bail!("unsupported target dtype for quantized artifact: {other}"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391,7 +446,7 @@ mod tests {
         let path = dir.path().join("q_artifact.safetensors");
         let cache = make_cache(2, 11);
         let quantized = crate::local::kv_quant::quantize_kv(&cache)?;
-        let saved = save_quantized_kv(&quantized, &path, "q-model", DType::F16)?;
+        let saved = save_quantized_kv(&quantized, &path, "q-model", QuantDtype::Float(DType::F16))?;
         assert_eq!(saved.num_layers, 2);
         assert_eq!(saved.num_tokens, 11);
         assert_eq!(saved.dtype, "F16");
@@ -462,23 +517,65 @@ mod tests {
     }
 
     #[test]
-    fn parse_dtype_accepts_float_targets() {
-        assert_eq!(parse_dtype("F16").unwrap(), DType::F16);
-        assert_eq!(parse_dtype("F32").unwrap(), DType::F32);
-        assert_eq!(parse_dtype("BF16").unwrap(), DType::BF16);
-        assert_eq!(parse_dtype("FP8").unwrap(), DType::F8E4M3);
-        assert_eq!(parse_dtype("F8").unwrap(), DType::F8E4M3);
-        assert_eq!(parse_dtype("F8E4M3").unwrap(), DType::F8E4M3);
+    fn parse_quant_dtype_accepts_float_targets() {
+        assert_eq!(
+            parse_quant_dtype("F16").unwrap(),
+            QuantDtype::Float(DType::F16)
+        );
+        assert_eq!(
+            parse_quant_dtype("F32").unwrap(),
+            QuantDtype::Float(DType::F32)
+        );
+        assert_eq!(
+            parse_quant_dtype("BF16").unwrap(),
+            QuantDtype::Float(DType::BF16)
+        );
+        assert_eq!(
+            parse_quant_dtype("FP8").unwrap(),
+            QuantDtype::Float(DType::F8E4M3)
+        );
+        assert_eq!(
+            parse_quant_dtype("F8").unwrap(),
+            QuantDtype::Float(DType::F8E4M3)
+        );
+        assert_eq!(
+            parse_quant_dtype("F8E4M3").unwrap(),
+            QuantDtype::Float(DType::F8E4M3)
+        );
     }
 
     #[test]
-    fn parse_dtype_rejects_unsupported_targets() {
-        for unsupported in ["I8", "U8", "I4", "U4", "FP4", "F4", "FP1"] {
-            let err = parse_dtype(unsupported).unwrap_err().to_string();
+    fn parse_quant_dtype_rejects_unsupported_targets() {
+        for unsupported in ["U8", "I4", "U4", "FP4", "F4", "FP1"] {
+            let err = parse_quant_dtype(unsupported).unwrap_err().to_string();
             assert!(
                 err.contains("not supported"),
                 "expected unsupported error for {unsupported}, got: {err}"
             );
         }
+    }
+
+    #[test]
+    fn parse_dtype_accepts_i8_storage() {
+        assert_eq!(parse_quant_dtype("I8").unwrap(), QuantDtype::Int8);
+    }
+
+    #[test]
+    fn save_and_load_int8_quantized_kv() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("q_i8.safetensors");
+        let cache = make_cache(2, 11);
+        let quantized = crate::local::kv_quant::quantize_kv(&cache)?;
+        let saved = save_quantized_kv(&quantized, &path, "q-model", QuantDtype::Int8)?;
+        assert_eq!(saved.dtype, "I8");
+        assert_eq!(saved.storage_dtype.as_deref(), Some("U8"));
+        assert!(saved.quantized);
+
+        let (loaded, artifact) = load_kv(&path, &Device::Cpu)?;
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(artifact.dtype, "I8");
+        assert_eq!(artifact.storage_dtype.as_deref(), Some("U8"));
+        assert!(artifact.quantized);
+        Ok(())
     }
 }
