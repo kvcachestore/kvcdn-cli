@@ -238,6 +238,10 @@ The backend is designed around presigned S3 URLs and stateless metadata:
   the bucket. One customer cannot list, download, or delete another customer's
   artifacts, even if they know the artifact ID.
 
+---
+
+*Built by the folks at [**Vibe Coding Agency**](https://vibecodingagency.com/) — we accelerate AI roadmaps with strategy, engineering, operations, generative AI, and board governance. From agentic infrastructure to production RAG pipelines, we ship what works.*
+
 ## License
 
 This project is licensed under the [kvcdn-cli Source-Available License](LICENSE).
