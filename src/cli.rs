@@ -131,12 +131,30 @@ pub struct QuantArgs {
         default_value = "\n\nQ: Summarize the key claim in one sentence.\nA:"
     )]
     pub question: String,
-    /// Target dequantized dtype: F32, F16, BF16, or FP8.
-    #[arg(long, default_value = "F16")]
+    /// Target dequantized dtype: F32, F16, BF16, FP8, or I8.
+    #[arg(long, alias = "dtype", default_value = "F16")]
     pub target_dtype: String,
     /// Device to run on: cpu, cuda, or metal. Auto-selected when omitted.
     #[arg(long, value_parser = crate::models::engine::parse_device)]
     pub device: Option<candle_core::Device>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn quant_args_dtype_alias() {
+        let args = QuantArgs::try_parse_from(["kvcdn", "--dtype", "F16"]).unwrap();
+        assert_eq!(args.target_dtype, "F16");
+    }
+
+    #[test]
+    fn quant_args_target_dtype_still_works() {
+        let args = QuantArgs::try_parse_from(["kvcdn", "--target-dtype", "F16"]).unwrap();
+        assert_eq!(args.target_dtype, "F16");
+    }
 }
 
 /// Authenticate with the hosted KVCDN service via OIDC.

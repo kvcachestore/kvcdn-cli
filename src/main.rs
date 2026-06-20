@@ -87,3 +87,27 @@ fn main() -> Result<()> {
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn quant_args_dtype_alias() {
+        let cli = Cli::try_parse_from(["kvcdn", "quant", "--dtype", "F16"]).unwrap();
+        match cli {
+            Cli::Quant(args) => assert_eq!(args.target_dtype, "F16"),
+            _ => panic!("expected Quant subcommand"),
+        }
+    }
+
+    #[test]
+    fn quant_args_target_dtype_still_works() {
+        let cli = Cli::try_parse_from(["kvcdn", "quant", "--target-dtype", "F16"]).unwrap();
+        match cli {
+            Cli::Quant(args) => assert_eq!(args.target_dtype, "F16"),
+            _ => panic!("expected Quant subcommand"),
+        }
+    }
+}

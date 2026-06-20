@@ -41,3 +41,4 @@ keyring = { version = "3", features = ["windows-native"] }
 [dev-dependencies]
 mockito = "1.6"
 tempfile = "3.14"
+proptest = "1"

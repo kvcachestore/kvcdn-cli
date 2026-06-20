@@ -152,7 +152,9 @@ kvcdn quant --context-file context.txt --question "What is the main point?" \
             --target-dtype F32 --verify
 ```
 
-Supported target dtypes: `F32`, `F16`, `BF16`, `FP8` (F8E4M3). `I8`, `U8`, `I4`, `U4`, `FP4`, and `FP1` are not supported because the artifact stores symmetric int8 values (U8) and Candle 0.10 does not implement `to_dtype` for FP4/FP1.
+`--dtype` is an alias for `--target-dtype`. Supported target dtypes are `F32`, `F16`, `BF16`, `FP8` (F8E4M3), and `I8`. The artifact always stores symmetric int8 values as `U8`; `I8` means the dequantizer will produce a standard int8-quantized artifact, while float targets dequantize to the requested float dtype. `U8`, `I4`, `U4`, `FP4`, and `FP1` are not supported because the artifact stores symmetric int8 values (U8) and Candle 0.10 does not implement `to_dtype` for FP4/FP1.
+
+Each successful `kvcdn quant` run writes a machine-readable event sidecar next to the output artifact (`<output>.quant-event.json`) containing the input/output paths, dtype, compression ratio, `max_quant_error`, and verification result.
 
 ## Build
 
