@@ -26,6 +26,12 @@ impl HttpTransfer {
     }
 }
 
+impl Default for HttpTransfer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Transfer for HttpTransfer {
     fn upload(&self, url: &str, source: Box<dyn Read + Send>, size_bytes: u64) -> Result<()> {
         let pb = ProgressBar::new(size_bytes);

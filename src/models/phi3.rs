@@ -3,7 +3,7 @@
 //! Adapted from `candle-transformers` 0.10.2.
 
 use candle_core::{D, DType, Device, IndexOp, Module, Result, Tensor};
-use candle_nn::{Activation, Linear, RmsNorm, VarBuilder, linear, linear_no_bias};
+use candle_nn::{Activation, Linear, RmsNorm, VarBuilder, linear_no_bias};
 use std::sync::Arc;
 
 use crate::models::{CausalLM, KVCache, ModelConfig};
@@ -298,8 +298,8 @@ impl Mlp {
     fn new(cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let hidden_size = cfg.hidden_size;
         let i_size = cfg.intermediate_size;
-        let gate_up_proj = linear(hidden_size, 2 * i_size, vb.pp("gate_up_proj"))?;
-        let down_proj = linear(i_size, hidden_size, vb.pp("down_proj"))?;
+        let gate_up_proj = linear_no_bias(hidden_size, 2 * i_size, vb.pp("gate_up_proj"))?;
+        let down_proj = linear_no_bias(i_size, hidden_size, vb.pp("down_proj"))?;
         Ok(Self {
             gate_up_proj,
             down_proj,

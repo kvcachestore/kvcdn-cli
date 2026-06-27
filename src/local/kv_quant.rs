@@ -10,11 +10,6 @@ use crate::models::KVCache;
 /// expose `DType::I8`, so the signed values are stored in `U8` with a +128
 /// offset; the dequantizer recenters before scaling.
 pub fn quantize_tensor(t: &Tensor) -> Result<(Tensor, Tensor)> {
-    let shape = t.shape();
-    if shape.rank() != 4 {
-        anyhow::bail!("expected rank-4 KV tensor, got shape {shape:?}");
-    }
-
     let f32_t = t.to_dtype(DType::F32)?;
     let abs = f32_t.abs()?;
     let max = abs.max_all()?;

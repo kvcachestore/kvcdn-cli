@@ -1,0 +1,4 @@
+Retrieval-augmented generation systems reuse long documents across many queries. Prefilling the same document repeatedly wastes GPU time and increases latency. KV caches capture the result of the expensive prefill phase so subsequent questions can skip it. This fixture validates that a model adapter can save, load, and quantize those caches without changing the generated tokens.
+
+Question: What problem do KV caches solve?
+Answer:

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use candle_core::Tensor;
 
+use crate::models::CausalLM;
 use crate::models::engine::ModelBundle;
 
 fn argmax_token(logits: &Tensor) -> Result<u32> {
@@ -9,12 +10,11 @@ fn argmax_token(logits: &Tensor) -> Result<u32> {
     Ok(idx)
 }
 
-/// Continue generation greedily from an existing KV cache.
-///
-/// `start_offset` is the number of tokens already cached. The first token in
-/// `prompt_tokens` is assumed to follow immediately after the cached prefix.
-pub fn generate(
-    bundle: &mut ModelBundle,
+/// Greedy-generate `n` tokens from `model`, continuing a prefix of length `start_offset`.
+/// `prompt_tokens` are processed first; the first generated token follows them.
+pub fn generate_with_model(
+    model: &mut dyn CausalLM,
+    device: &candle_core::Device,
     prompt_tokens: &[u32],
     start_offset: usize,
     n: usize,
@@ -24,18 +24,33 @@ pub fn generate(
         return Ok(out);
     }
 
-    // Run prompt tokens through the model once; logits are for the last token.
-    let input = Tensor::new(prompt_tokens, &bundle.device)?.unsqueeze(0)?;
-    let logits = bundle.model.forward(&input, start_offset)?;
+    let input = Tensor::new(prompt_tokens, device)?.unsqueeze(0)?;
+    let logits = model.forward(&input, start_offset)?;
     let mut next = argmax_token(&logits)?;
 
     for i in 0..n {
         out.push(next);
         let offset = start_offset + prompt_tokens.len() + i;
-        let input = Tensor::new(&[next], &bundle.device)?.unsqueeze(0)?;
-        let logits = bundle.model.forward(&input, offset)?;
+        let input = Tensor::new(&[next], device)?.unsqueeze(0)?;
+        let logits = model.forward(&input, offset)?;
         next = argmax_token(&logits)?;
     }
 
     Ok(out)
+}
+
+/// Backwards-compatible wrapper that generates from a `ModelBundle`.
+pub fn generate(
+    bundle: &mut ModelBundle,
+    prompt_tokens: &[u32],
+    start_offset: usize,
+    n: usize,
+) -> Result<Vec<u32>> {
+    generate_with_model(
+        &mut *bundle.model,
+        &bundle.device,
+        prompt_tokens,
+        start_offset,
+        n,
+    )
 }

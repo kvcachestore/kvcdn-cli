@@ -1,26 +1,26 @@
 pub mod engine;
-
-pub mod bloom;
-pub mod chatglm;
-pub mod deepseek2;
-pub mod falcon;
-pub mod gemma;
-pub mod gemma3;
-pub mod glm4;
-pub mod gpt2;
-pub mod granite;
-pub mod granite_moe;
-pub mod llama;
-pub mod mamba;
-pub mod mamba2;
-pub mod olmo;
-pub mod phi3;
-pub mod qwen2;
-pub mod qwen3;
 pub(crate) mod registry;
-pub mod rwkv6;
-pub mod stable_lm;
-pub mod starcoder2;
+
+pub(crate) mod bloom;
+pub(crate) mod chatglm;
+pub(crate) mod deepseek2;
+pub(crate) mod falcon;
+pub(crate) mod gemma;
+pub(crate) mod gemma3;
+pub(crate) mod glm4;
+pub(crate) mod gpt2;
+pub(crate) mod granite;
+pub(crate) mod granite_moe;
+pub(crate) mod llama;
+pub(crate) mod mamba;
+pub(crate) mod mamba2;
+pub(crate) mod olmo;
+pub(crate) mod phi3;
+pub(crate) mod qwen2;
+pub(crate) mod qwen3;
+pub(crate) mod rwkv6;
+pub(crate) mod stable_lm;
+pub(crate) mod starcoder2;
 
 use candle_core::{Result, Tensor};
 

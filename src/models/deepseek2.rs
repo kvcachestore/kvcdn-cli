@@ -217,18 +217,23 @@ fn bincount(values: &[u32], minlength: u32) -> Vec<u32> {
     counts
 }
 
-/// Returns a `(result_len, ndim)` tensor of nonzero indices.
+/// Returns a `(result_len, ndim)` tensor of nonzero indices in row-major order.
 fn nonzero(t: &Tensor) -> Result<Tensor> {
-    let data = t.to_vec1::<u8>()?;
+    let data = t.flatten_all()?.to_vec1::<u8>()?;
     let dims = t.dims().to_vec();
     let ndim = dims.len();
     let mut indices = Vec::new();
+    // Compute row-major strides so flat index = sum(row[i] * stride[i]).
+    let mut strides = vec![1usize; ndim];
+    for i in (0..ndim.saturating_sub(1)).rev() {
+        strides[i] = strides[i + 1] * dims[i + 1];
+    }
     for (idx, &v) in data.iter().enumerate() {
         if v != 0 {
             let mut rem = idx;
-            for d in dims.iter().rev() {
-                indices.push((rem % d) as u32);
-                rem /= d;
+            for stride in &strides {
+                indices.push((rem / stride) as u32);
+                rem %= stride;
             }
         }
     }
@@ -527,14 +532,19 @@ impl Attention {
                 .transpose(1, 2)?
         };
 
+        // Apply rotary embeddings to the new query/key-position tensors at the
+        // current offset. The cached k_pe already carries rope from prior steps.
+        let (q_pe, k_pe) = self.rotary_emb.forward(&q_pe, &k_pe, seqlen_offset)?;
+
         // Concatenate with the latent cache if it exists.
-        if let Some((prev_ckv, prev_k_pe)) = self.kv_cache.take() {
+        let (compressed_kv, k_pe) = if let Some((prev_ckv, prev_k_pe)) = self.kv_cache.take() {
             compressed_kv = Tensor::cat(&[&prev_ckv, &compressed_kv], 1)?;
             let k_pe = Tensor::cat(&[&prev_k_pe, &k_pe], 2)?;
-            self.kv_cache = Some((compressed_kv.clone(), k_pe));
+            (compressed_kv, k_pe)
         } else {
-            self.kv_cache = Some((compressed_kv.clone(), k_pe.clone()));
-        }
+            (compressed_kv, k_pe)
+        };
+        self.kv_cache = Some((compressed_kv.clone(), k_pe.clone()));
         let total_seq_len = compressed_kv.dim(1)?;
 
         let kv = {
@@ -554,7 +564,6 @@ impl Attention {
         let v = kv_split[1].clone();
 
         let k_pe = self.kv_cache.as_ref().unwrap().1.clone();
-        let (q_pe, k_pe) = self.rotary_emb.forward(&q_pe, &k_pe, seqlen_offset)?;
 
         let q = Tensor::cat(&[q_nope, q_pe], D::Minus1)?;
         let k = Tensor::cat(
