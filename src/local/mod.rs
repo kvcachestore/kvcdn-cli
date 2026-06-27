@@ -1,6 +1,7 @@
 pub mod benchmark;
 pub mod continuation;
 pub mod diag;
+pub mod infer;
 pub mod kv_io;
 pub mod kv_quant;
 pub mod plot;

@@ -74,9 +74,21 @@ kvcdn download <artifact-id> --project acme --output context.q8.kv
 
 # Delete an artifact
 kvcdn delete <artifact-id> --project acme --yes
+
+# Run inference against an uploaded artifact (skips local download/prefill)
+curl -X POST "https://$API_HOST/v1/orgs/$ORG/projects/$PROJECT/artifacts/$ARTIFACT_ID/infer" \
+  -H "Authorization: Bearer $(kvcdn whoami --format json | jq -r .access_token)" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the main point?", "n": 32}'
 ```
 
-The CLI reads backend and OIDC settings from `~/.config/kvcdn/config.toml` (or `KVCDN_*` environment variables) so that `kvcdn login`, `kvcdn upload`, and `kvcdn delete` can reach your deployed backend. The backend operator provides the `api_url` and `issuer_url` values; fill in the placeholders below with the values they give you:
+The inference response contains the generated token IDs:
+
+```json
+{"artifact_id": "...", "tokens": [123, 456, ...], "token_count": 32}
+```
+
+The backend spawns the local `kvcdn` inference engine; set `KVCDN_BINARY_PATH` if the binary is not on the backend's `PATH`. The CLI reads backend and OIDC settings from `~/.config/kvcdn/config.toml` (or `KVCDN_*` environment variables) so that `kvcdn login`, `kvcdn upload`, and `kvcdn delete` can reach your deployed backend. The backend operator provides the `api_url` and `issuer_url` values; fill in the placeholders below with the values they give you:
 
 ```toml
 api_url = "https://<your-api-host>"
@@ -112,8 +124,15 @@ Currently supported architectures:
 - `LlamaForCausalLM` (and Llama-3.1/3.2 fine-tunes)
 - `MistralForCausalLM` / `MixtralForCausalLM`
 - `YiForCausalLM`
+- `Qwen2ForCausalLM`
 - `Qwen3ForCausalLM`
+- `Phi3ForCausalLM`
 - `GemmaForCausalLM` (and Gemma 2 fine-tunes)
+
+Implemented but not yet validated end-to-end:
+
+- `DeepseekV2ForCausalLM` / `DeepseekV3ForCausalLM` — wired and passes reference/cache verify; the MLA compressed-KV cache is too sensitive to the current per-tensor symmetric int8 quantizer to pass quantized verify.
+- `Gemma3ForCausalLM` — wired; official checkpoints are gated on Hugging Face and require `HF_TOKEN` for validation.
 
 Known unsupported families (open an issue on GitHub to request them):
 
@@ -121,7 +140,6 @@ Known unsupported families (open an issue on GitHub to request them):
 - Kimi / Moonshot / Moonlight
 - Mamba / RWKV / state-space models
 - Nemotron
-- Phi / Phi-3 / Phi-4
 - GPT-NeoX / GPT-2 / Bloom
 
 Adding a new family only requires implementing the `CausalLM` trait in `src/models/` and registering it in `src/models/registry.rs`.

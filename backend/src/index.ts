@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
 import { artifactsRoutes } from "./routes/artifacts.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
+import { inferenceRoutes } from "./routes/inference.js";
 import { quotaRoutes } from "./routes/quota.js";
 import { oidcRoutes, getOidcKeyPair } from "./routes/oidc.js";
 import { isMockOidc } from "./auth.js";
@@ -62,6 +63,7 @@ export async function build(options: BuildOptions = {}): Promise<FastifyInstance
   fastify.register(artifactsRoutes);
   fastify.register(apiKeyRoutes);
   fastify.register(quotaRoutes);
+  fastify.register(inferenceRoutes);
 
   if (isMockOidc()) {
     fastify.register(oidcRoutes, { prefix: "/oidc" });

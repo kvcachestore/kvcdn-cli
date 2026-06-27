@@ -1,12 +1,11 @@
-mod cli;
-mod config;
-mod core;
-mod hosted;
-mod local;
-mod models;
-
 use anyhow::Result;
 use clap::Parser;
+use kvcdn::cli::{
+    AdminArgs, ApiKeyArgs, BenchmarkArgs, DeleteArgs, DiagArgs, DownloadArgs, InferArgs, ListArgs,
+    LoginArgs, LogoutArgs, PlotArgs, QuantArgs, QuotaArgs, UploadArgs, VerifyArgs, WhoamiArgs,
+};
+use kvcdn::cli::{AdminCommand, ApiKeyCommand};
+use kvcdn::{hosted, local};
 
 #[derive(Parser)]
 #[command(name = "kvcdn")]
@@ -16,35 +15,37 @@ use clap::Parser;
 #[command(version)]
 enum Cli {
     /// Verify a saved KV cache produces token-exact output.
-    Verify(cli::VerifyArgs),
+    Verify(VerifyArgs),
     /// Compare scratch-prefill vs. KV-cache logits.
-    Diag(cli::DiagArgs),
+    Diag(DiagArgs),
     /// Measure prefill vs. continuation speedup.
-    Benchmark(cli::BenchmarkArgs),
+    Benchmark(BenchmarkArgs),
     /// Plot benchmark results from a CSV.
-    Plot(cli::PlotArgs),
+    Plot(PlotArgs),
     /// Quantize a KV artifact and optionally verify accuracy.
-    Quant(cli::QuantArgs),
+    Quant(QuantArgs),
     /// Authenticate with the hosted KVCDN service.
-    Login(cli::LoginArgs),
+    Login(LoginArgs),
     /// Remove stored OIDC tokens and API key.
-    Logout(cli::LogoutArgs),
+    Logout(LogoutArgs),
     /// Manage the stored KVCDN API key.
-    ApiKey(cli::ApiKeyArgs),
+    ApiKey(ApiKeyArgs),
     /// Upload a KV artifact to KVCDN.
-    Upload(cli::UploadArgs),
+    Upload(UploadArgs),
     /// List remote KV artifacts in a KVCDN project.
-    List(cli::ListArgs),
+    List(ListArgs),
     /// Download a remote KV artifact from KVCDN.
-    Download(cli::DownloadArgs),
+    Download(DownloadArgs),
     /// Delete a remote KV artifact from KVCDN.
-    Delete(cli::DeleteArgs),
+    Delete(DeleteArgs),
     /// Show account quota amount and utilization.
-    Quota(cli::QuotaArgs),
+    Quota(QuotaArgs),
     /// Show the current user and active org/project.
-    Whoami(cli::WhoamiArgs),
+    Whoami(WhoamiArgs),
+    /// Internal: run continuation generation against a loaded KV artifact.
+    Infer(InferArgs),
     /// Operator-only administration commands.
-    Admin(cli::AdminArgs),
+    Admin(AdminArgs),
 }
 
 fn main() -> Result<()> {
@@ -63,14 +64,14 @@ fn main() -> Result<()> {
         Cli::Login(args) => hosted::login::run(args),
         Cli::Logout(args) => hosted::logout::run(args),
         Cli::ApiKey(args) => match args.command {
-            cli::ApiKeyCommand::Set { key } => hosted::api_key::set(key),
-            cli::ApiKeyCommand::Verify {
+            ApiKeyCommand::Set { key } => hosted::api_key::set(key),
+            ApiKeyCommand::Verify {
                 api_key,
                 api_url,
                 org,
                 project,
             } => hosted::api_key::verify(api_key, api_url, org, project),
-            cli::ApiKeyCommand::Clear => hosted::api_key::clear(),
+            ApiKeyCommand::Clear => hosted::api_key::clear(),
         },
         Cli::Upload(args) => hosted::upload::run(args),
         Cli::List(args) => hosted::list::run(args),
@@ -78,8 +79,15 @@ fn main() -> Result<()> {
         Cli::Delete(args) => hosted::delete::run(args),
         Cli::Quota(args) => hosted::quota::run(args),
         Cli::Whoami(args) => hosted::whoami::run(args),
+        Cli::Infer(args) => {
+            let tokens = local::infer::run(args)?;
+            for token in tokens {
+                println!("{token}");
+            }
+            Ok(())
+        }
         Cli::Admin(args) => match args.command {
-            cli::AdminCommand::MintApiKey {
+            AdminCommand::MintApiKey {
                 org,
                 api_url,
                 admin_secret,

@@ -1,5 +1,29 @@
 use clap::Parser;
 
+/// Internal command: load a KV artifact and run continuation generation.
+/// Not intended for direct user use; invoked by the backend inference endpoint.
+#[derive(Parser)]
+pub struct InferArgs {
+    /// Hugging Face model identifier for the artifact.
+    #[arg(long)]
+    pub model: String,
+    /// Path to the KV artifact (or `-` to read from stdin).
+    #[arg(long, default_value = "-")]
+    pub input: String,
+    /// Continuation prompt text.
+    #[arg(long)]
+    pub question: String,
+    /// Number of tokens to generate.
+    #[arg(long, default_value_t = 32)]
+    pub n: usize,
+    /// Hugging Face model revision.
+    #[arg(long)]
+    pub revision: Option<String>,
+    /// Device to run on: cpu, cuda, or metal. Auto-selected when omitted.
+    #[arg(long, value_parser = crate::models::engine::parse_device)]
+    pub device: Option<candle_core::Device>,
+}
+
 /// Verify that loading a saved KV cache produces token-exact output.
 #[derive(Parser)]
 pub struct VerifyArgs {

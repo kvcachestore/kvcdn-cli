@@ -56,6 +56,7 @@ export function artifactMeta(overrides: Partial<Record<string, unknown>> = {}) {
     num_tokens: 128,
     num_layers: 32,
     quantized: false,
+    model_name: "Qwen/Qwen3-0.6B",
     ...overrides,
   };
 }

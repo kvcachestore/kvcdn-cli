@@ -9,6 +9,7 @@ export const UploadMetaSchema = z.object({
   num_tokens: z.number().int().nonnegative(),
   num_layers: z.number().int().nonnegative(),
   quantized: z.boolean(),
+  model_name: z.string().min(1),
   visibility: z.enum(["public", "private"]).default("private"),
 });
 

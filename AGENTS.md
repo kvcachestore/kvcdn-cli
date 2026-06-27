@@ -47,3 +47,5 @@ npm run dev       # tsx src/index.ts
 - `scripts/build-release.sh` runs the full Dagger `Release` pipeline (Rust lint/test, backend tests, release build, SBOM, Trivy scan, optional cosign signing). Set `COSIGN_PRIVATE_KEY` to produce `.sig` files.
 - `kvcdn login` opens a browser by default; use `--no-browser` in headless/automated environments.
 - API keys are deterministic per org: `kv_<hex>` derived from `KVCDN_API_KEY_SEED` + org slug via HKDF-SHA256. Mint them with `POST /v1/admin/api-keys` using `KVCDN_ADMIN_SECRET`.
+- The hosted inference endpoint (`POST /v1/orgs/:org/projects/:project/artifacts/:artifact_id/infer`) requires the `kvcdn` release binary to be on the backend's `PATH` or pointed to by `KVCDN_BINARY_PATH`.
+- When adding or updating a model adapter, run `scripts/validate-adapters.sh` to prove token-exact verify and quantized verify against the tracked reference checkpoints (currently Qwen2-0.5B and Phi-3-mini-4k-instruct). Add new architectures to the `KVCDN_VALIDATE_MODELS` list in the script once they pass.

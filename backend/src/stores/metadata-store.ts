@@ -11,6 +11,7 @@ export interface ArtifactMetadata {
   num_tokens: number;
   num_layers: number;
   quantized: boolean;
+  model_name: string;
   visibility: "public" | "private";
   created_at: string;
 }
