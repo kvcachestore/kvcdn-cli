@@ -29,6 +29,12 @@ kvcdn --help
 
 To build from source instead, see the [Build](#build) section.
 
+## Local-only usage
+
+No authentication is required for local generation, verification, quantization, or benchmarking.
+
+![Local verify and quant demo](docs/assets/kvcdn-local.gif)
+
 ## Commands
 
 - `kvcdn verify` — verify that loading a saved KV cache produces token-exact output.
@@ -51,12 +57,6 @@ To build from source instead, see the [Build](#build) section.
 kvcdn uses `.kv` as the file extension for KV cache artifacts (for example, `context.kv`, `model.kv`, or `context.q8.kv` after quantization). The CLI's default output paths, upload/download examples, and hosted workflows all follow this convention.
 
 If you provide an explicit `--kv-path`, `--output`, or `--input` path that does not end in `.kv`, the CLI automatically appends `.kv` and prints a warning so the convention is enforced.
-
-## Local-only usage
-
-No authentication is required for local generation, verification, quantization, or benchmarking.
-
-![Local verify and quant demo](docs/assets/kvcdn-local.gif)
 
 ## Hosted usage
 
