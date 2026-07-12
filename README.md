@@ -56,9 +56,13 @@ If you provide an explicit `--kv-path`, `--output`, or `--input` path that does 
 
 No authentication is required for local generation, verification, quantization, or benchmarking.
 
+![Local verify and quant demo](docs/assets/kvcdn-local.gif)
+
 ## Hosted usage
 
 Run `kvcdn login` to authenticate. Use `kvcdn api-key set <key>` to store an API key for non-interactive uploads. Use `kvcdn upload <artifact.kv> --name <name>` to store caches in your hosted KVCDN endpoint. Artifacts are private by default; pass `--visibility public` to make an artifact fetchable without authentication.
+
+![Hosted quota/upload/list/download/delete demo](docs/assets/kvcdn-hosted.gif)
 
 Common hosted workflows:
 

@@ -38,3 +38,8 @@ paper/*.synctex.gz
 backend/node_modules/
 backend/dist/
 .omo/
+
+# Demo/recording tooling
+.venv-r2/
+.tools/
+
