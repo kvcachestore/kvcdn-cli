@@ -36,6 +36,7 @@ To build from source instead, see the [Build](#build) section.
 - `kvcdn benchmark` — measure prefill vs. continuation speedup.
 - `kvcdn plot` — summarize benchmark results.
 - `kvcdn quant` — quantize a KV artifact and optionally run token-exact verification.
+- `kvcdn search` — find saved KV artifacts by longest token-prefix match.
 - `kvcdn login` — authenticate with the hosted service via OIDC.
 - `kvcdn logout` — remove stored OIDC tokens and API key.
 - `kvcdn api-key` — manage the stored KVCDN API key.
@@ -168,6 +169,23 @@ Quantize a KV artifact with a target dequantization dtype and verify continuatio
 ```bash
 kvcdn quant --context-file context.txt --question "What is the main point?" \
             --target-dtype F32 --verify
+```
+
+Search saved KV artifacts for the one whose prompt tokens share the longest prefix with a new query:
+
+```bash
+kvcdn search --model Qwen/Qwen3-0.6B \
+             --dir ~/.local/share/kvcdn/verify \
+             --query "What is the main point?"
+```
+
+Generate multiple greedy continuation candidates from the matched prefix (the shared prefix is decoded once, so the forks are nearly free):
+
+```bash
+kvcdn search --model Qwen/Qwen3-0.6B \
+             --dir ~/.local/share/kvcdn/verify \
+             --query "What is the main point?" \
+             --tree 4 --tree-tokens 32
 ```
 
 `--dtype` is an alias for `--target-dtype`. Supported target dtypes are `F32`, `F16`, `BF16`, `FP8` (F8E4M3), and `I8`. The artifact always stores symmetric int8 values as `U8`; `I8` means the dequantizer will produce a standard int8-quantized artifact, while float targets dequantize to the requested float dtype. `U8`, `I4`, `U4`, `FP4`, and `FP1` are not supported because the artifact stores symmetric int8 values (U8) and Candle 0.10 does not implement `to_dtype` for FP4/FP1.
