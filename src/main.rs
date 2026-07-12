@@ -5,7 +5,10 @@ use kvcdn::cli::{
     LoginArgs, LogoutArgs, PlotArgs, QuantArgs, QuotaArgs, UploadArgs, VerifyArgs, WhoamiArgs,
 };
 use kvcdn::cli::{AdminCommand, ApiKeyCommand};
+use kvcdn::telemetry::{self, TelemetryEvent};
 use kvcdn::{hosted, local};
+use std::env;
+use std::time::{Duration, Instant};
 
 #[derive(Parser)]
 #[command(name = "kvcdn")]
@@ -48,8 +51,28 @@ enum Cli {
     Admin(AdminArgs),
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
+fn command_name(cli: &Cli) -> &'static str {
+    match cli {
+        Cli::Verify(_) => "verify",
+        Cli::Diag(_) => "diag",
+        Cli::Benchmark(_) => "benchmark",
+        Cli::Plot(_) => "plot",
+        Cli::Quant(_) => "quant",
+        Cli::Login(_) => "login",
+        Cli::Logout(_) => "logout",
+        Cli::ApiKey(_) => "api-key",
+        Cli::Upload(_) => "upload",
+        Cli::List(_) => "list",
+        Cli::Download(_) => "download",
+        Cli::Delete(_) => "delete",
+        Cli::Quota(_) => "quota",
+        Cli::Whoami(_) => "whoami",
+        Cli::Infer(_) => "infer",
+        Cli::Admin(_) => "admin",
+    }
+}
+
+fn run_command(cli: Cli) -> Result<()> {
     match cli {
         Cli::Verify(args) => local::verify::run(args),
         Cli::Diag(args) => local::diag::run(args),
@@ -94,6 +117,33 @@ fn main() -> Result<()> {
             } => hosted::admin::mint_api_key(org, api_url, admin_secret),
         },
     }
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    let start = Instant::now();
+    let name = command_name(&cli);
+    let result = run_command(cli);
+
+    let api_url = env::var("KVCDN_API_URL").unwrap_or_default();
+    let telemetry_enabled = env::var("KVCDN_TELEMETRY").unwrap_or_else(|_| "1".to_string()) != "0";
+    if telemetry_enabled && !api_url.is_empty() {
+        let event = TelemetryEvent {
+            command: name.to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            duration_ms: telemetry::duration_ms(start),
+            success: result.is_ok(),
+            error_kind: result
+                .as_ref()
+                .err()
+                .map(|e| telemetry::categorize_error(e).as_str().to_string()),
+        };
+        if let Some(rx) = telemetry::submit(event, api_url) {
+            let _ = rx.recv_timeout(Duration::from_millis(150));
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]

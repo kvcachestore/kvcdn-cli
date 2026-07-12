@@ -260,6 +260,18 @@ The backend is designed around presigned S3 URLs and stateless metadata:
 
 ---
 
+## Telemetry
+
+kvcdn collects minimal, anonymous telemetry about command usage. Each hosted command sends one event containing the command name, CLI version, duration, and whether the command succeeded. No prompts, model weights, file contents, or personally identifiable information are included.
+
+Telemetry is **opt-out**: it is sent whenever `KVCDN_API_URL` is configured, unless you disable it:
+
+```bash
+export KVCDN_TELEMETRY=0
+```
+
+Events are delivered to the configured backend (`/v1/telemetry`), which may forward them to a telemetry service using `KVCDN_TELEMETRY_URL` and `KVCDN_TELEMETRY_SECRET`. The CLI waits up to 150 ms for delivery and never blocks command output on telemetry.
+
 *Built by the folks at [**Vibe Coding Agency**](https://vibecodingagency.com/) — we accelerate AI roadmaps with strategy, engineering, operations, generative AI, and board governance. From agentic infrastructure to production RAG pipelines, we ship what works.*
 
 ## License

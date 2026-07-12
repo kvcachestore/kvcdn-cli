@@ -4,3 +4,4 @@ pub mod core;
 pub mod hosted;
 pub mod local;
 pub mod models;
+pub mod telemetry;
