@@ -2,7 +2,8 @@ use anyhow::Result;
 use clap::Parser;
 use kvcdn::cli::{
     AdminArgs, ApiKeyArgs, BenchmarkArgs, DeleteArgs, DiagArgs, DownloadArgs, InferArgs, ListArgs,
-    LoginArgs, LogoutArgs, PlotArgs, QuantArgs, QuotaArgs, UploadArgs, VerifyArgs, WhoamiArgs,
+    LoginArgs, LogoutArgs, PlotArgs, QuantArgs, QuotaArgs, SearchArgs, UploadArgs, VerifyArgs,
+    WhoamiArgs,
 };
 use kvcdn::cli::{AdminCommand, ApiKeyCommand};
 use kvcdn::telemetry::{self, TelemetryEvent};
@@ -45,6 +46,8 @@ enum Cli {
     Quota(QuotaArgs),
     /// Show the current user and active org/project.
     Whoami(WhoamiArgs),
+    /// Search saved KV artifacts by token-prefix match.
+    Search(SearchArgs),
     /// Internal: run continuation generation against a loaded KV artifact.
     Infer(InferArgs),
     /// Operator-only administration commands.
@@ -67,6 +70,7 @@ fn command_name(cli: &Cli) -> &'static str {
         Cli::Delete(_) => "delete",
         Cli::Quota(_) => "quota",
         Cli::Whoami(_) => "whoami",
+        Cli::Search(_) => "search",
         Cli::Infer(_) => "infer",
         Cli::Admin(_) => "admin",
     }
@@ -102,6 +106,7 @@ fn run_command(cli: Cli) -> Result<()> {
         Cli::Delete(args) => hosted::delete::run(args),
         Cli::Quota(args) => hosted::quota::run(args),
         Cli::Whoami(args) => hosted::whoami::run(args),
+        Cli::Search(args) => local::search::run(args),
         Cli::Infer(args) => {
             let tokens = local::infer::run(args)?;
             for token in tokens {
@@ -166,6 +171,29 @@ mod tests {
         match cli {
             Cli::Quant(args) => assert_eq!(args.target_dtype, "F16"),
             _ => panic!("expected Quant subcommand"),
+        }
+    }
+
+    #[test]
+    fn cli_search_parse() {
+        let cli = Cli::try_parse_from([
+            "kvcdn",
+            "search",
+            "--model",
+            "Qwen/Qwen3-0.6B",
+            "--dir",
+            "/tmp/kv",
+            "--query",
+            "hello",
+        ])
+        .unwrap();
+        match cli {
+            Cli::Search(args) => {
+                assert_eq!(args.model, "Qwen/Qwen3-0.6B");
+                assert_eq!(args.dir, "/tmp/kv");
+                assert_eq!(args.query, "hello");
+            }
+            _ => panic!("expected Search subcommand"),
         }
     }
 }

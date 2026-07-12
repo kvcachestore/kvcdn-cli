@@ -46,7 +46,13 @@ pub fn run(args: VerifyArgs) -> Result<()> {
     if let Some(parent) = kv_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let art = kv_io::save_kv(&cache, &kv_path, &args.model)?;
+    let art = kv_io::save_kv_with_meta(
+        &cache,
+        &kv_path,
+        &args.model,
+        Some(context.clone()),
+        Some(ctx_tokens.clone()),
+    )?;
     println!(
         "saved KV: {} tokens, {} layers, {:.1} MB, dtype={}",
         art.num_tokens,

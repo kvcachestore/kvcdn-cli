@@ -90,6 +90,12 @@ pub struct KVArtifact {
     pub storage_dtype: Option<String>,
     pub nbytes: u64,
     pub quantized: bool,
+    /// Original prompt text that produced this KV cache, if available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    /// Token IDs of the original prompt, if available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<Vec<u32>>,
 }
 
 impl KVArtifact {
@@ -120,6 +126,16 @@ fn read_meta<P: AsRef<Path>>(path: P) -> Result<Option<KVArtifact>> {
 }
 
 pub fn save_kv<P: AsRef<Path>>(cache: &KVCache, path: P, model_name: &str) -> Result<KVArtifact> {
+    save_kv_with_meta(cache, path, model_name, None, None)
+}
+
+pub fn save_kv_with_meta<P: AsRef<Path>>(
+    cache: &KVCache,
+    path: P,
+    model_name: &str,
+    prompt: Option<String>,
+    tokens: Option<Vec<u32>>,
+) -> Result<KVArtifact> {
     if cache.is_empty() {
         anyhow::bail!("cannot save empty KV cache");
     }
@@ -144,6 +160,8 @@ pub fn save_kv<P: AsRef<Path>>(cache: &KVCache, path: P, model_name: &str) -> Re
         storage_dtype: Some(dtype),
         nbytes,
         quantized: false,
+        prompt,
+        tokens,
     };
     write_meta(&path, &artifact)?;
     Ok(artifact)
@@ -156,6 +174,17 @@ pub fn save_quantized_kv<P: AsRef<Path>>(
     path: P,
     model_name: &str,
     target_dtype: QuantDtype,
+) -> Result<KVArtifact> {
+    save_quantized_kv_with_meta(layers, path, model_name, target_dtype, None, None)
+}
+
+pub fn save_quantized_kv_with_meta<P: AsRef<Path>>(
+    layers: &[(Tensor, Tensor, Tensor, Tensor)],
+    path: P,
+    model_name: &str,
+    target_dtype: QuantDtype,
+    prompt: Option<String>,
+    tokens: Option<Vec<u32>>,
 ) -> Result<KVArtifact> {
     if layers.is_empty() {
         anyhow::bail!("cannot save empty quantized KV cache");
@@ -184,6 +213,8 @@ pub fn save_quantized_kv<P: AsRef<Path>>(
         storage_dtype: Some(storage_dtype),
         nbytes,
         quantized: true,
+        prompt,
+        tokens,
     };
     write_meta(&path, &artifact)?;
     Ok(artifact)
@@ -265,6 +296,8 @@ pub fn load_kv<P: AsRef<Path>>(path: P, device: &Device) -> Result<(KVCache, KVA
             storage_dtype: Some(dtype),
             nbytes,
             quantized: false,
+            prompt: None,
+            tokens: None,
         },
     ))
 }
@@ -396,6 +429,8 @@ pub fn read_kv_metadata<P: AsRef<Path>>(path: P) -> Result<KVArtifact> {
         storage_dtype,
         nbytes,
         quantized,
+        prompt: None,
+        tokens: None,
     })
 }
 
@@ -576,6 +611,29 @@ mod tests {
         assert_eq!(artifact.dtype, "I8");
         assert_eq!(artifact.storage_dtype.as_deref(), Some("U8"));
         assert!(artifact.quantized);
+        Ok(())
+    }
+
+    #[test]
+    fn save_and_load_kv_with_prompt_and_tokens() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("artifact.kv");
+        let cache = make_cache(2, 5);
+        let prompt = "hello world".to_string();
+        let tokens = vec![1u32, 2, 3, 4, 5];
+        let saved = save_kv_with_meta(
+            &cache,
+            &path,
+            "test-model",
+            Some(prompt.clone()),
+            Some(tokens.clone()),
+        )?;
+        assert_eq!(saved.prompt, Some(prompt));
+        assert_eq!(saved.tokens, Some(tokens));
+
+        let (_loaded, artifact) = load_kv(&path, &Device::Cpu)?;
+        assert_eq!(artifact.prompt, Some("hello world".to_string()));
+        assert_eq!(artifact.tokens, Some(vec![1, 2, 3, 4, 5]));
         Ok(())
     }
 }

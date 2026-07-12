@@ -59,11 +59,27 @@ pub fn run_quant_pipeline(
     args: &QuantArgs,
     target_dtype: kv_io::QuantDtype,
 ) -> Result<QuantPipelineResult> {
+    run_quant_pipeline_with_meta(cache, args, target_dtype, None, None)
+}
+
+pub fn run_quant_pipeline_with_meta(
+    cache: &KVCache,
+    args: &QuantArgs,
+    target_dtype: kv_io::QuantDtype,
+    prompt: Option<String>,
+    tokens: Option<Vec<u32>>,
+) -> Result<QuantPipelineResult> {
     let input_path = resolve_output_path("quant", &args.model, &args.input, "kv")?;
     if let Some(parent) = input_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let orig_art = kv_io::save_kv(cache, &input_path, &args.model)?;
+    let orig_art = kv_io::save_kv_with_meta(
+        cache,
+        &input_path,
+        &args.model,
+        prompt.clone(),
+        tokens.clone(),
+    )?;
 
     let output_path = match &args.output {
         Some(p) => ensure_kv_extension(Path::new(p)),
@@ -80,7 +96,14 @@ pub fn run_quant_pipeline(
     }
 
     let quantized = quantize_kv(cache)?;
-    let q_art = kv_io::save_quantized_kv(&quantized, &output_path, &args.model, target_dtype)?;
+    let q_art = kv_io::save_quantized_kv_with_meta(
+        &quantized,
+        &output_path,
+        &args.model,
+        target_dtype,
+        prompt,
+        tokens,
+    )?;
 
     let dequant_dtype = match target_dtype {
         kv_io::QuantDtype::Int8 => DType::F16,
@@ -147,14 +170,15 @@ pub fn run(args: QuantArgs) -> Result<()> {
         })?
     };
 
-    let ctx_tokens = if let Some(path) = &args.context_file {
-        encode(
-            &bundle.tokenizer,
-            &fs::read_to_string(path).with_context(|| format!("reading context file {path:?}"))?,
-            true,
-        )?
+    let (ctx_tokens, prompt) = if let Some(path) = &args.context_file {
+        let text =
+            fs::read_to_string(path).with_context(|| format!("reading context file {path:?}"))?;
+        (encode(&bundle.tokenizer, &text, true)?, Some(text))
     } else {
-        context_of_length(&bundle.tokenizer, args.context_tokens)?
+        (
+            context_of_length(&bundle.tokenizer, args.context_tokens)?,
+            None,
+        )
     };
     let question = &args.question;
     let q_tokens = encode(&bundle.tokenizer, question, false)?;
@@ -164,7 +188,13 @@ pub fn run(args: QuantArgs) -> Result<()> {
     // Prefill context and run the model-free quantization pipeline.
     bundle.model.clear_kv_cache();
     let cache = prefill(&mut bundle, &ctx_tokens)?;
-    let pipeline = run_quant_pipeline(&cache, &args, target_dtype)?;
+    let pipeline = run_quant_pipeline_with_meta(
+        &cache,
+        &args,
+        target_dtype,
+        prompt,
+        Some(ctx_tokens.clone()),
+    )?;
     let input_path = &pipeline.input_path;
     let output_path = &pipeline.output_path;
     let orig_art = &pipeline.orig_art;

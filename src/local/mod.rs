@@ -7,5 +7,7 @@ pub mod kv_quant;
 pub mod plot;
 pub mod prefill;
 pub mod quant;
+pub mod search;
+pub mod search_tree;
 pub mod tokenize;
 pub mod verify;

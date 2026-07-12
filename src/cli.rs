@@ -179,6 +179,29 @@ mod tests {
         let args = QuantArgs::try_parse_from(["kvcdn", "--target-dtype", "F16"]).unwrap();
         assert_eq!(args.target_dtype, "F16");
     }
+
+    #[test]
+    fn search_args_parse() {
+        let args = SearchArgs::try_parse_from([
+            "kvcdn",
+            "--model",
+            "Qwen/Qwen3-0.6B",
+            "--dir",
+            "/tmp/kv",
+            "--query",
+            "hello",
+            "--tree",
+            "4",
+            "--tree-tokens",
+            "16",
+        ])
+        .unwrap();
+        assert_eq!(args.model, "Qwen/Qwen3-0.6B");
+        assert_eq!(args.dir, "/tmp/kv");
+        assert_eq!(args.query, "hello");
+        assert_eq!(args.tree, Some(4));
+        assert_eq!(args.tree_tokens, 16);
+    }
 }
 
 /// Authenticate with the hosted KVCDN service via OIDC.
@@ -404,6 +427,35 @@ pub struct WhoamiArgs {
     /// Project slug to use. Defaults to the configured default project.
     #[arg(long)]
     pub project: Option<String>,
+}
+
+/// Search saved KV artifacts for the longest token-prefix match.
+#[derive(Parser)]
+pub struct SearchArgs {
+    /// Hugging Face model identifier whose artifacts to search.
+    #[arg(long)]
+    pub model: String,
+    /// Directory to scan recursively for `.kv` artifacts.
+    #[arg(long)]
+    pub dir: String,
+    /// Query prompt to match against stored artifact prefixes.
+    #[arg(long)]
+    pub query: String,
+    /// Generate N greedy candidate continuations from the matched prefix.
+    #[arg(long)]
+    pub tree: Option<usize>,
+    /// Number of tokens to generate per tree candidate.
+    #[arg(long, default_value_t = 32)]
+    pub tree_tokens: usize,
+    /// Output format for the prefix-search result.
+    #[arg(long, default_value = "table")]
+    pub format: String,
+    /// Device to run tree generation on: cpu, cuda, or metal.
+    #[arg(long, value_parser = crate::models::engine::parse_device)]
+    pub device: Option<candle_core::Device>,
+    /// Hugging Face model revision.
+    #[arg(long)]
+    pub revision: Option<String>,
 }
 
 /// Operator-only administration commands.
