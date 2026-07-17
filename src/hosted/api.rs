@@ -196,6 +196,7 @@ impl ApiClient {
         let mut url = url::Url::parse(&self.cfg.api_url)?;
         url.path_segments_mut()
             .map_err(|_| anyhow!("cannot modify URL path"))?
+            .push("api")
             .push("v1")
             .push("api-keys")
             .push("verify");
@@ -262,6 +263,7 @@ fn upload_init_url(api_url: &str, org: &str, project: &str) -> Result<String> {
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("orgs")
         .push(org)
@@ -280,6 +282,7 @@ fn delete_artifact_url(
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("orgs")
         .push(org)
@@ -294,6 +297,7 @@ fn list_artifacts_url(api_url: &str, org: &str, project: &str) -> Result<String>
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("orgs")
         .push(org)
@@ -312,6 +316,7 @@ fn download_artifact_url(
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("orgs")
         .push(org)
@@ -332,6 +337,7 @@ fn complete_upload_url(
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("orgs")
         .push(org)
@@ -347,6 +353,7 @@ fn quota_url(api_url: &str) -> Result<String> {
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("quota");
     Ok(url.to_string())
@@ -390,7 +397,7 @@ mod tests {
 
         let body = r#"{"artifact_id":"abc","upload_url":"https://example.com/upload"}"#;
         let _init = server
-            .mock("POST", "/v1/orgs/default/projects/default/artifacts")
+            .mock("POST", "/api/v1/orgs/default/projects/default/artifacts")
             .match_header("authorization", "Bearer new_token")
             .with_status(201)
             .with_header("content-type", "application/json")
@@ -432,7 +439,7 @@ mod tests {
 
         let body = r#"{"artifact_id":"artifact-1","upload_url":"https://example.com/upload"}"#;
         let _init = server
-            .mock("POST", "/v1/orgs/default/projects/default/artifacts")
+            .mock("POST", "/api/v1/orgs/default/projects/default/artifacts")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(201)
             .with_header("content-type", "application/json")
@@ -470,32 +477,32 @@ mod tests {
     #[test]
     fn init_upload_url_uses_v1_orgs_projects_artifacts() {
         let url = upload_init_url("https://api.example.com", "default", "default").unwrap();
-        assert!(url.contains("/v1/orgs/default/projects/default/artifacts"));
+        assert!(url.contains("/api/v1/orgs/default/projects/default/artifacts"));
     }
 
     #[test]
     fn delete_artifact_url_uses_v1_orgs_projects_artifacts_id() {
         let url = delete_artifact_url("https://api.example.com", "default", "acme", "abc").unwrap();
-        assert!(url.contains("/v1/orgs/default/projects/acme/artifacts/abc"));
+        assert!(url.contains("/api/v1/orgs/default/projects/acme/artifacts/abc"));
     }
 
     #[test]
     fn list_artifacts_url_uses_v1_orgs_projects_artifacts() {
         let url = list_artifacts_url("https://api.example.com", "default", "acme").unwrap();
-        assert!(url.contains("/v1/orgs/default/projects/acme/artifacts"));
+        assert!(url.contains("/api/v1/orgs/default/projects/acme/artifacts"));
     }
 
     #[test]
     fn download_artifact_url_uses_v1_orgs_projects_artifacts_id_download() {
         let url =
             download_artifact_url("https://api.example.com", "default", "acme", "abc").unwrap();
-        assert!(url.contains("/v1/orgs/default/projects/acme/artifacts/abc/download"));
+        assert!(url.contains("/api/v1/orgs/default/projects/acme/artifacts/abc/download"));
     }
 
     #[test]
     fn quota_url_uses_v1_quota() {
         let url = quota_url("https://api.example.com").unwrap();
-        assert!(url.ends_with("/v1/quota"));
+        assert!(url.ends_with("/api/v1/quota"));
     }
 
     #[test]
@@ -505,7 +512,7 @@ mod tests {
 
         let body = r#"{"customer_id":"cust-1","quota":{"organizations":10,"projects":100,"artifacts":1000,"storage_bytes":1099511627776},"used":{"organizations":1,"projects":2,"artifacts":3,"storage_bytes":1234}}"#;
         let _quota = server
-            .mock("GET", "/v1/quota")
+            .mock("GET", "/api/v1/quota")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -539,7 +546,7 @@ mod tests {
         let _delete = server
             .mock(
                 "DELETE",
-                "/v1/orgs/default/projects/acme/artifacts/artifact-1",
+                "/api/v1/orgs/default/projects/acme/artifacts/artifact-1",
             )
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(204)
@@ -570,7 +577,7 @@ mod tests {
         let _complete = server
             .mock(
                 "POST",
-                "/v1/orgs/acme/projects/widgets/artifacts/artifact-2/complete",
+                "/api/v1/orgs/acme/projects/widgets/artifacts/artifact-2/complete",
             )
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
@@ -600,7 +607,7 @@ mod tests {
 
         let body = r#"{"artifacts":[{"artifact_id":"a1","name":"first","size_bytes":100,"sha256":"deadbeef","dtype":"F16","storage_dtype":null,"num_tokens":8,"num_layers":2,"quantized":false,"visibility":"private","created_at":"2024-01-01T00:00:00Z"}]}"#;
         let _list = server
-            .mock("GET", "/v1/orgs/acme/projects/widgets/artifacts")
+            .mock("GET", "/api/v1/orgs/acme/projects/widgets/artifacts")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -634,7 +641,7 @@ mod tests {
         let _download = server
             .mock(
                 "GET",
-                "/v1/orgs/acme/projects/widgets/artifacts/a1/download",
+                "/api/v1/orgs/acme/projects/widgets/artifacts/a1/download",
             )
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
@@ -665,7 +672,7 @@ mod tests {
         let base = server.url();
 
         let _init = server
-            .mock("POST", "/v1/orgs/acme/projects/widgets/artifacts")
+            .mock("POST", "/api/v1/orgs/acme/projects/widgets/artifacts")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(201)
             .with_header("content-type", "application/json")
@@ -675,14 +682,14 @@ mod tests {
         let _complete = server
             .mock(
                 "POST",
-                "/v1/orgs/acme/projects/widgets/artifacts/rt1/complete",
+                "/api/v1/orgs/acme/projects/widgets/artifacts/rt1/complete",
             )
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(200)
             .create();
 
         let _list = server
-            .mock("GET", "/v1/orgs/acme/projects/widgets/artifacts")
+            .mock("GET", "/api/v1/orgs/acme/projects/widgets/artifacts")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -692,7 +699,7 @@ mod tests {
         let _download = server
             .mock(
                 "GET",
-                "/v1/orgs/acme/projects/widgets/artifacts/rt1/download",
+                "/api/v1/orgs/acme/projects/widgets/artifacts/rt1/download",
             )
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(200)
@@ -701,7 +708,7 @@ mod tests {
             .create();
 
         let _delete = server
-            .mock("DELETE", "/v1/orgs/acme/projects/widgets/artifacts/rt1")
+            .mock("DELETE", "/api/v1/orgs/acme/projects/widgets/artifacts/rt1")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(204)
             .create();

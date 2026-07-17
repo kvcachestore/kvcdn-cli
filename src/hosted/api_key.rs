@@ -95,7 +95,11 @@ pub fn verify(
 
     let cfg = Config::load(api_url, None, None, org, project, Some(key.clone()))?;
 
-    cfg.require_hosted()?;
+    if cfg.api_url.is_empty() {
+        anyhow::bail!(
+            "api_url is not configured. Set KVCDN_API_URL or add api_url to ~/.config/kvcdn/config.toml."
+        );
+    }
     let org = cfg.default_org.clone();
     let project = cfg.default_project.clone();
     let url = verify_url(&cfg.api_url)?;
@@ -142,6 +146,7 @@ fn verify_url(api_url: &str) -> Result<String> {
     let mut url = url::Url::parse(api_url)?;
     url.path_segments_mut()
         .map_err(|_| anyhow::anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("api-keys")
         .push("verify");

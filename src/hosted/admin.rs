@@ -29,6 +29,7 @@ pub fn mint_api_key(
         .with_context(|| format!("parsing API URL {}", cfg.api_url))?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("cannot modify URL path"))?
+        .push("api")
         .push("v1")
         .push("admin")
         .push("api-keys");

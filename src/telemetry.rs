@@ -110,7 +110,7 @@ pub fn submit(event: TelemetryEvent, api_url: String) -> Option<mpsc::Receiver<(
             Err(_) => return,
         };
 
-        let url = format!("{api_url}/v1/telemetry");
+        let url = format!("{api_url}/api/v1/telemetry");
         let _ = client
             .post(&url)
             .header("content-type", "application/json")
@@ -222,7 +222,7 @@ mod tests {
             "success": true,
         });
         let mock = server
-            .mock("POST", "/v1/telemetry")
+            .mock("POST", "/api/v1/telemetry")
             .match_header("content-type", "application/json")
             .match_body(mockito::Matcher::Json(expected_body))
             .with_status(204)
@@ -245,7 +245,7 @@ mod tests {
     fn submit_signals_completion_when_upstream_fails() {
         let mut server = mockito::Server::new();
         let mock = server
-            .mock("POST", "/v1/telemetry")
+            .mock("POST", "/api/v1/telemetry")
             .with_status(503)
             .create();
 

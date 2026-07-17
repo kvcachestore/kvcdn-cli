@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::Path;
 
-const DEFAULT_API_URL: &str = "";
-const DEFAULT_ISSUER_URL: &str = "";
+const DEFAULT_API_URL: &str = "https://api.kvcachestore.com";
+const DEFAULT_ISSUER_URL: &str = "https://pocketid.kvcachestore.com";
 const DEFAULT_CLIENT_ID: &str = "kvcdn-cli";
 const DEFAULT_ORG: &str = "default";
 const DEFAULT_PROJECT: &str = "default";
@@ -351,5 +351,17 @@ api_key = "kv_file"
     fn load_uses_default_org() {
         let cfg = Config::load_with_config_dir(None, None, None, None, None, None, None).unwrap();
         assert_eq!(cfg.default_org, DEFAULT_ORG);
+    }
+
+    #[test]
+    fn load_uses_production_defaults() {
+        with_kvcdn_env_cleared(|| {
+            let dir = tempfile::tempdir().unwrap();
+            let cfg =
+                Config::load_with_config_dir(Some(dir.path()), None, None, None, None, None, None)
+                    .unwrap();
+            assert_eq!(cfg.api_url, DEFAULT_API_URL);
+            assert_eq!(cfg.issuer_url, DEFAULT_ISSUER_URL);
+        });
     }
 }
