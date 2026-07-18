@@ -5,7 +5,7 @@ import { artifactMeta, startTestServer } from "./helpers.js";
 
 process.env.KVCDN_CLIENT_ID = "kvcdn-cli";
 
-describe("GET /v1/quota", () => {
+describe("GET /api/v1/quota", () => {
   let app: FastifyInstance | undefined;
   let baseUrl: string | undefined;
 
@@ -33,13 +33,13 @@ describe("GET /v1/quota", () => {
   });
 
   it("returns 401 without authorization", async () => {
-    const response = await fetch(`${baseUrl}/v1/quota`);
+    const response = await fetch(`${baseUrl}/api/v1/quota`);
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject({ error: "Unauthorized" });
   });
 
   it("returns zero usage for a customer with no artifacts", async () => {
-    const response = await fetch(`${baseUrl}/v1/quota`, {
+    const response = await fetch(`${baseUrl}/api/v1/quota`, {
       headers: { authorization: `Bearer ${apiKey}` },
     });
     expect(response.status).toBe(200);
@@ -63,7 +63,7 @@ describe("GET /v1/quota", () => {
     const meta = artifactMeta({ name: "quota-artifact.kv", size_bytes: 100 });
 
     const upload = async (org: string, project: string) => {
-      const response = await fetch(`${baseUrl}/v1/orgs/${org}/projects/${project}/artifacts`, {
+      const response = await fetch(`${baseUrl}/api/v1/orgs/${org}/projects/${project}/artifacts`, {
         method: "POST",
         headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
         body: JSON.stringify(meta),
@@ -75,7 +75,7 @@ describe("GET /v1/quota", () => {
     await upload("acme", "project-a");
     await upload("acme", "project-b");
 
-    const response = await fetch(`${baseUrl}/v1/quota`, {
+    const response = await fetch(`${baseUrl}/api/v1/quota`, {
       headers: { authorization: `Bearer ${apiKey}` },
     });
     expect(response.status).toBe(200);

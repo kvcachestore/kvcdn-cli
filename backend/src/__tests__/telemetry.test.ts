@@ -3,7 +3,7 @@ import nock from "nock";
 import { startTestServer } from "./helpers.js";
 import type { FastifyInstance } from "fastify";
 
-describe("POST /v1/telemetry", () => {
+describe("POST /api/v1/telemetry", () => {
   let app: FastifyInstance | undefined;
   let baseUrl: string | undefined;
 
@@ -20,7 +20,7 @@ describe("POST /v1/telemetry", () => {
     delete process.env.KVCDN_TELEMETRY_URL;
     delete process.env.KVCDN_TELEMETRY_SECRET;
 
-    const response = await fetch(`${baseUrl}/v1/telemetry`, {
+    const response = await fetch(`${baseUrl}/api/v1/telemetry`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -35,7 +35,7 @@ describe("POST /v1/telemetry", () => {
   });
 
   it("rejects malformed events with 400", async () => {
-    const response = await fetch(`${baseUrl}/v1/telemetry`, {
+    const response = await fetch(`${baseUrl}/api/v1/telemetry`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ command: "", version: "0.2.0", duration_ms: -1, success: true }),
@@ -64,7 +64,7 @@ describe("POST /v1/telemetry", () => {
       .matchHeader("content-type", "application/json")
       .reply(204);
 
-    const response = await fetch(`${baseUrl}/v1/telemetry`, {
+    const response = await fetch(`${baseUrl}/api/v1/telemetry`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -86,7 +86,7 @@ describe("POST /v1/telemetry", () => {
 
     nock("https://telemetry.example.com").post("/events").reply(503);
 
-    const response = await fetch(`${baseUrl}/v1/telemetry`, {
+    const response = await fetch(`${baseUrl}/api/v1/telemetry`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -101,7 +101,7 @@ describe("POST /v1/telemetry", () => {
   });
 
   it("rejects events with an invalid error_kind", async () => {
-    const response = await fetch(`${baseUrl}/v1/telemetry`, {
+    const response = await fetch(`${baseUrl}/api/v1/telemetry`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

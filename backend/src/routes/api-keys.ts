@@ -11,7 +11,7 @@ interface GenerateBody {
 }
 
 export async function apiKeyRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.post("/v1/api-keys/verify", async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post("/api/v1/api-keys/verify", async (request: FastifyRequest, reply: FastifyReply) => {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return reply.status(401).send({ error: "Unauthorized" });
@@ -31,7 +31,7 @@ export async function apiKeyRoutes(fastify: FastifyInstance): Promise<void> {
   // should be behind a secret admin token; for now it requires KVCDN_ADMIN_SECRET.
   fastify.post<{
     Body: GenerateBody;
-  }>("/v1/admin/api-keys", async (request: FastifyRequest<{ Body: GenerateBody }>, reply: FastifyReply) => {
+  }>("/api/v1/admin/api-keys", async (request: FastifyRequest<{ Body: GenerateBody }>, reply: FastifyReply) => {
     const adminSecret = process.env.KVCDN_ADMIN_SECRET;
     const authHeader = request.headers.authorization;
     if (!adminSecret || !authHeader || authHeader !== `Bearer ${adminSecret}`) {

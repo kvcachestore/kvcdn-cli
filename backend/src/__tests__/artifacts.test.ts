@@ -10,7 +10,7 @@ import { HashedTenantResolver, deriveCustomerId } from "../stores/tenant-resolve
 
 process.env.KVCDN_CLIENT_ID = "kvcdn-cli";
 
-describe("POST /v1/projects/:project/artifacts", () => {
+describe("POST /api/v1/projects/:project/artifacts", () => {
   let app: FastifyInstance | undefined;
   let baseUrl: string | undefined;
   const meta = artifactMeta();
@@ -28,7 +28,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   it("returns 201 with artifact_id and upload_url for a valid JWT", async () => {
     const token = await getAccessToken(baseUrl!);
 
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -43,7 +43,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   });
 
   it("returns 401 when Authorization header is missing", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -54,7 +54,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   });
 
   it("returns 401 for an invalid JWT", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: "Bearer not-a-real-token", "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -65,7 +65,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   });
 
   it("returns 401 when the issuer does not match", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: "Bearer not-a-real-token", "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -75,7 +75,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   });
 
   it("returns 401 when the audience does not match", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: "Bearer not-a-real-token", "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -85,14 +85,14 @@ describe("POST /v1/projects/:project/artifacts", () => {
   });
 
   it("returns 401 when Authorization header is missing for DELETE", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${meta.sha256}`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${meta.sha256}`, {
       method: "DELETE",
     });
     expect(response.status).toBe(401);
   });
 
   it("returns 401 for an invalid JWT on DELETE", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${meta.sha256}`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${meta.sha256}`, {
       method: "DELETE",
       headers: { authorization: "Bearer not-a-real-token" },
     });
@@ -101,14 +101,14 @@ describe("POST /v1/projects/:project/artifacts", () => {
 
   it("lists artifacts for a project", async () => {
     const token = await getAccessToken(baseUrl!);
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
     });
     expect(uploadResponse.status).toBe(201);
 
-    const listResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const listResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(listResponse.status).toBe(200);
@@ -119,7 +119,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
 
   it("returns a presigned download URL for an existing artifact", async () => {
     const token = await getAccessToken(baseUrl!);
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -127,7 +127,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const downloadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`, {
+    const downloadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`, {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(downloadResponse.status).toBe(200);
@@ -140,7 +140,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
 
   it("returns 404 when downloading a missing artifact", async () => {
     const token = await getAccessToken(baseUrl!);
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/00000000-0000-0000-0000-000000000000/download`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/00000000-0000-0000-0000-000000000000/download`, {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(response.status).toBe(404);
@@ -149,7 +149,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   it("allows unauthenticated download of public artifacts", async () => {
     const token = await getAccessToken(baseUrl!);
     const publicMeta = { ...meta, visibility: "public" };
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(publicMeta),
@@ -157,7 +157,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const downloadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`);
+    const downloadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`);
     expect(downloadResponse.status).toBe(200);
     const body = (await downloadResponse.json()) as { artifact_id: string; download_url: string };
     expect(body.artifact_id).toBe(artifactId);
@@ -166,7 +166,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
 
   it("requires authentication to download private artifacts", async () => {
     const token = await getAccessToken(baseUrl!);
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -174,7 +174,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const downloadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`);
+    const downloadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`);
     expect(downloadResponse.status).toBe(401);
   });
 
@@ -185,7 +185,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
       await store.put(key, body);
     };
     const token = await getAccessToken(baseUrl!);
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -197,7 +197,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
     const dataKey = `artifacts/customers/${customerId}/orgs/acme/projects/acme/${artifactId}/${meta.name}`;
     await putObject(dataKey, Buffer.from("e2e-dummy-content", "utf-8"));
 
-    const completeResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}/complete`, {
+    const completeResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}/complete`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}` },
     });
@@ -212,7 +212,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
       sha256: expectedSha256,
       size_bytes: Buffer.byteLength(actualData, "utf-8"),
     };
-    const upload2 = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const upload2 = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(metaWithCorrectSha),
@@ -222,7 +222,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
     const dataKey2 = `artifacts/customers/${customerId}/orgs/acme/projects/acme/${artifactId2}/${meta.name}`;
     await putObject(dataKey2, Buffer.from(actualData, "utf-8"));
 
-    const complete2 = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId2}/complete`, {
+    const complete2 = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId2}/complete`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}` },
     });
@@ -230,7 +230,7 @@ describe("POST /v1/projects/:project/artifacts", () => {
   });
 
   it("returns 401 when listing without authorization", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`);
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`);
     expect(response.status).toBe(401);
   });
 });
@@ -257,8 +257,8 @@ describe("API key auth", () => {
     delete process.env.KVCDN_ISSUER_URL;
   });
 
-  it("returns 200 for a valid API key on /v1/api-keys/verify", async () => {
-    const response = await fetch(`${baseUrl}/v1/api-keys/verify`, {
+  it("returns 200 for a valid API key on /api/v1/api-keys/verify", async () => {
+    const response = await fetch(`${baseUrl}/api/v1/api-keys/verify`, {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}` },
     });
@@ -267,7 +267,7 @@ describe("API key auth", () => {
   });
 
   it("returns 401 for an invalid API key", async () => {
-    const response = await fetch(`${baseUrl}/v1/api-keys/verify`, {
+    const response = await fetch(`${baseUrl}/api/v1/api-keys/verify`, {
       method: "POST",
       headers: { authorization: "Bearer kv_wrong_key" },
     });
@@ -275,7 +275,7 @@ describe("API key auth", () => {
   });
 
   it("accepts API key for artifact upload", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -288,7 +288,7 @@ describe("API key auth", () => {
   });
 
   it("returns 401 for an invalid API key on artifact delete", async () => {
-    const response = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${meta.sha256}`, {
+    const response = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${meta.sha256}`, {
       method: "DELETE",
       headers: { authorization: "Bearer kv_wrong_key" },
     });
@@ -320,7 +320,7 @@ describe("artifact isolation between orgs", () => {
   });
 
   it("acme can upload and list its own artifact", async () => {
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${acmeKey}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -328,7 +328,7 @@ describe("artifact isolation between orgs", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const listResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const listResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       headers: { authorization: `Bearer ${acmeKey}` },
     });
     expect(listResponse.status).toBe(200);
@@ -337,7 +337,7 @@ describe("artifact isolation between orgs", () => {
   });
 
   it("contoso cannot list acme's artifacts", async () => {
-    const listResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const listResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       headers: { authorization: `Bearer ${contosoKey}` },
     });
     expect(listResponse.status).toBe(200);
@@ -346,7 +346,7 @@ describe("artifact isolation between orgs", () => {
   });
 
   it("contoso cannot download an acme artifact by id", async () => {
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${acmeKey}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -354,14 +354,14 @@ describe("artifact isolation between orgs", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const downloadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`, {
+    const downloadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`, {
       headers: { authorization: `Bearer ${contosoKey}` },
     });
     expect(downloadResponse.status).toBe(404);
   });
 
   it("contoso cannot delete an acme artifact by id", async () => {
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${acmeKey}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -369,13 +369,13 @@ describe("artifact isolation between orgs", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const deleteResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}`, {
+    const deleteResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${contosoKey}` },
     });
     expect(deleteResponse.status).toBe(404);
 
-    const ownerDownloadResponse = await fetch(`${baseUrl}/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`, {
+    const ownerDownloadResponse = await fetch(`${baseUrl}/api/v1/orgs/acme/projects/acme/artifacts/${artifactId}/download`, {
       headers: { authorization: `Bearer ${acmeKey}` },
     });
     expect(ownerDownloadResponse.status).toBe(200);
@@ -400,7 +400,7 @@ describe("artifact isolation between OIDC subjects", () => {
 
   it("alice can upload and list her own artifact", async () => {
     const token = await getAccessToken(baseUrl!, "alice");
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -408,7 +408,7 @@ describe("artifact isolation between OIDC subjects", () => {
     expect(uploadResponse.status).toBe(201);
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
-    const listResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const listResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(listResponse.status).toBe(200);
@@ -418,7 +418,7 @@ describe("artifact isolation between OIDC subjects", () => {
 
   it("bob cannot list alice's artifacts", async () => {
     const aliceToken = await getAccessToken(baseUrl!, "alice");
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${aliceToken}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -426,7 +426,7 @@ describe("artifact isolation between OIDC subjects", () => {
     expect(uploadResponse.status).toBe(201);
 
     const bobToken = await getAccessToken(baseUrl!, "bob");
-    const listResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const listResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       headers: { authorization: `Bearer ${bobToken}` },
     });
     expect(listResponse.status).toBe(200);
@@ -436,7 +436,7 @@ describe("artifact isolation between OIDC subjects", () => {
 
   it("bob cannot download an alice artifact by id", async () => {
     const aliceToken = await getAccessToken(baseUrl!, "alice");
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${aliceToken}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -445,7 +445,7 @@ describe("artifact isolation between OIDC subjects", () => {
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
     const bobToken = await getAccessToken(baseUrl!, "bob");
-    const downloadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts/${artifactId}/download`, {
+    const downloadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts/${artifactId}/download`, {
       headers: { authorization: `Bearer ${bobToken}` },
     });
     expect(downloadResponse.status).toBe(404);
@@ -453,7 +453,7 @@ describe("artifact isolation between OIDC subjects", () => {
 
   it("bob cannot delete an alice artifact by id", async () => {
     const aliceToken = await getAccessToken(baseUrl!, "alice");
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${aliceToken}`, "content-type": "application/json" },
       body: JSON.stringify(meta),
@@ -462,13 +462,13 @@ describe("artifact isolation between OIDC subjects", () => {
     const { artifact_id: artifactId } = (await uploadResponse.json()) as { artifact_id: string };
 
     const bobToken = await getAccessToken(baseUrl!, "bob");
-    const deleteResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts/${artifactId}`, {
+    const deleteResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts/${artifactId}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${bobToken}` },
     });
     expect(deleteResponse.status).toBe(404);
 
-    const ownerDownloadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts/${artifactId}/download`, {
+    const ownerDownloadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts/${artifactId}/download`, {
       headers: { authorization: `Bearer ${aliceToken}` },
     });
     expect(ownerDownloadResponse.status).toBe(200);
@@ -567,7 +567,7 @@ describe("mock OIDC device-code flow", () => {
     const tokenData = (await tokenResponse.json()) as { access_token: string };
     expect(tokenData.access_token).toBeTruthy();
 
-    const uploadResponse = await fetch(`${baseUrl}/v1/orgs/personal/projects/personal/artifacts`, {
+    const uploadResponse = await fetch(`${baseUrl}/api/v1/orgs/personal/projects/personal/artifacts`, {
       method: "POST",
       headers: { authorization: `Bearer ${tokenData.access_token}`, "content-type": "application/json" },
       body: JSON.stringify(artifactMeta({

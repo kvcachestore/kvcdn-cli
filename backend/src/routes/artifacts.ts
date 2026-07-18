@@ -56,7 +56,7 @@ export async function artifactsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post<{
     Params: ArtifactsParams;
     Body: ArtifactsBody;
-  }>("/v1/orgs/:org/projects/:project/artifacts", async (request: FastifyRequest<{ Params: ArtifactsParams; Body: ArtifactsBody }>, reply: FastifyReply) => {
+  }>("/api/v1/orgs/:org/projects/:project/artifacts", async (request: FastifyRequest<{ Params: ArtifactsParams; Body: ArtifactsBody }>, reply: FastifyReply) => {
     let tenant: Tenant;
     try {
       tenant = await requireAuth(request, fastify);
@@ -99,7 +99,7 @@ export async function artifactsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get<{
     Params: ArtifactsParams;
     Querystring: { limit?: string; continuation?: string };
-  }>("/v1/orgs/:org/projects/:project/artifacts", async (request: FastifyRequest<{ Params: ArtifactsParams; Querystring: { limit?: string; continuation?: string } }>, reply: FastifyReply) => {
+  }>("/api/v1/orgs/:org/projects/:project/artifacts", async (request: FastifyRequest<{ Params: ArtifactsParams; Querystring: { limit?: string; continuation?: string } }>, reply: FastifyReply) => {
     let tenant: Tenant;
     try {
       tenant = await requireAuth(request, fastify);
@@ -122,7 +122,7 @@ export async function artifactsRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.get<{
     Params: ArtifactsParams;
-  }>("/v1/orgs/:org/projects/:project/artifacts/:artifact_id/download", async (request: FastifyRequest<{ Params: ArtifactsParams }>, reply: FastifyReply) => {
+  }>("/api/v1/orgs/:org/projects/:project/artifacts/:artifact_id/download", async (request: FastifyRequest<{ Params: ArtifactsParams }>, reply: FastifyReply) => {
     const tenant = await optionalAuth(request, fastify);
     const { org, project, artifact_id: artifactId } = request.params;
     if (!isValidArtifactId(artifactId)) {
@@ -149,7 +149,7 @@ export async function artifactsRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.delete<{
     Params: ArtifactsParams;
-  }>("/v1/orgs/:org/projects/:project/artifacts/:artifact_id", async (request: FastifyRequest<{ Params: ArtifactsParams }>, reply: FastifyReply) => {
+  }>("/api/v1/orgs/:org/projects/:project/artifacts/:artifact_id", async (request: FastifyRequest<{ Params: ArtifactsParams }>, reply: FastifyReply) => {
     let tenant: Tenant;
     try {
       tenant = await requireAuth(request, fastify);
@@ -185,7 +185,7 @@ export async function artifactsRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.post<{
     Params: ArtifactsParams;
-  }>("/v1/orgs/:org/projects/:project/artifacts/:artifact_id/complete", async (request: FastifyRequest<{ Params: ArtifactsParams }>, reply: FastifyReply) => {
+  }>("/api/v1/orgs/:org/projects/:project/artifacts/:artifact_id/complete", async (request: FastifyRequest<{ Params: ArtifactsParams }>, reply: FastifyReply) => {
     let tenant: Tenant;
     try {
       tenant = await requireAuth(request, fastify);

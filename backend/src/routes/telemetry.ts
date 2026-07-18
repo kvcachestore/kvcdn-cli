@@ -56,7 +56,7 @@ function postJson(url: string, secret: string, body: unknown): Promise<{ status:
 
 export async function telemetryRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post(
-    "/v1/telemetry",
+    "/api/v1/telemetry",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let body: TelemetryEvent;
       try {

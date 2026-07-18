@@ -41,7 +41,7 @@ export async function inferenceRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post<{
     Params: InferenceParams;
     Body: InferenceBody;
-  }>("/v1/orgs/:org/projects/:project/artifacts/:artifact_id/infer", async (request, reply) => {
+  }>("/api/v1/orgs/:org/projects/:project/artifacts/:artifact_id/infer", async (request, reply) => {
     const tenant = await optionalAuth(request, fastify);
     const { org, project, artifact_id: artifactId } = request.params;
     if (!isValidArtifactId(artifactId)) {

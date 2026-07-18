@@ -78,7 +78,7 @@ async function aggregateUsage(
 }
 
 export async function quotaRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.get("/v1/quota", async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get("/api/v1/quota", async (request: FastifyRequest, reply: FastifyReply) => {
     let tenant: Tenant;
     try {
       tenant = await requireAuth(request, fastify);
