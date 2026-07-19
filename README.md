@@ -17,11 +17,11 @@ In short, kvcdn turns the long-context prefill problem into a cache-and-serve pr
 
 ## Install
 
-Download the release binary for Linux x86-64 from the [v0.1.0 release page](https://github.com/kvcachestore/kvcdn-cli/releases/tag/v0.1.0):
+Download the release binary for Linux x86-64 from the [latest release page](https://github.com/kvcachestore/kvcdn-cli/releases/latest):
 
 ```bash
 curl -L -o kvcdn \
-  https://github.com/kvcachestore/kvcdn-cli/releases/download/v0.1.0/kvcdn-x86_64-unknown-linux-gnu
+  https://github.com/kvcachestore/kvcdn-cli/releases/latest/download/kvcdn-x86_64-unknown-linux-gnu
 chmod +x kvcdn
 sudo mv kvcdn /usr/local/bin/kvcdn
 kvcdn --help
@@ -68,20 +68,20 @@ Common hosted workflows:
 
 ```bash
 # Upload an artifact
-kvcdn upload context.q8.kv --name context --project acme
+kvcdn upload context.q8.kv --name context
 
-# List artifacts in a project
-kvcdn list --project acme
-kvcdn list --project acme --format json
+# List artifacts
+kvcdn list
+kvcdn list --format json
 
 # Download an artifact
-kvcdn download <artifact-id> --project acme --output context.q8.kv
+kvcdn download <artifact-id> --output context.q8.kv
 
 # Delete an artifact
-kvcdn delete <artifact-id> --project acme --yes
+kvcdn delete <artifact-id> --yes
 
 # Run inference against an uploaded artifact (skips local download/prefill)
-curl -X POST "https://$API_HOST/v1/orgs/$ORG/projects/$PROJECT/artifacts/$ARTIFACT_ID/infer" \
+curl -X POST "https://$API_HOST/api/v1/orgs/$ORG/projects/$PROJECT/artifacts/$ARTIFACT_ID/infer" \
   -H "Authorization: Bearer $(kvcdn whoami --format json | jq -r .access_token)" \
   -H "Content-Type: application/json" \
   -d '{"question": "What is the main point?", "n": 32}'
@@ -103,13 +103,13 @@ default_org = "acme"
 default_project = "acme"
 ```
 
-All hosted commands accept `--org` and `--project` overrides. `default_org` is included for forward compatibility; the current backend routes by `project`, so most users will set both to the same value.
+Artifacts are scoped to the project of the API key (or login session) you authenticate with; the hosted API routes (`/api/v1/artifacts`) do not take org/project path segments. The `--org` and `--project` flags are still accepted for backwards compatibility but no longer affect routing.
 
 Run `kvcdn login` to authenticate interactively, or store an org-scoped API key with `kvcdn api-key set <key>` for non-interactive use.
 
 ## Model support
 
-`--model` accepts any Hugging Face model identifier. The loader inspects the model's `config.json` `architectures` field and dispatches to a matching adapter.
+`--model` accepts any Hugging Face model identifier. The loader inspects the model's `config.json` `architectures` field and dispatches to a matching adapter. Downloaded checkpoints are stored in the standard Hugging Face cache location: `HF_HUB_CACHE` if set, otherwise `$HF_HOME/hub`, otherwise `~/.cache/huggingface/hub`.
 
 ### Example model for first-time users
 
@@ -292,7 +292,7 @@ Telemetry is **opt-out**: it is sent whenever `KVCDN_API_URL` is configured, unl
 export KVCDN_TELEMETRY=0
 ```
 
-Events are delivered to the configured backend (`/v1/telemetry`), which may forward them to a telemetry service using `KVCDN_TELEMETRY_URL` and `KVCDN_TELEMETRY_SECRET`. The CLI waits up to 150 ms for delivery and never blocks command output on telemetry.
+Events are delivered to the configured backend (`/api/v1/telemetry`), which may forward them to a telemetry service using `KVCDN_TELEMETRY_URL` and `KVCDN_TELEMETRY_SECRET`. The CLI waits up to 150 ms for delivery and never blocks command output on telemetry.
 
 *Built by the folks at [**Vibe Coding Agency**](https://vibecodingagency.com/) — we accelerate AI roadmaps with strategy, engineering, operations, generative AI, and board governance. From agentic infrastructure to production RAG pipelines, we ship what works.*
 

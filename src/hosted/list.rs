@@ -19,7 +19,7 @@ pub fn run(args: crate::cli::ListArgs) -> Result<()> {
 
     let mut client = ApiClient::new(cfg)?;
     let artifacts = client
-        .list_artifacts(&org, &project)
+        .list_artifacts()
         .context("failed to list artifacts")?;
 
     match args.format.as_str() {

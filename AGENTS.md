@@ -39,13 +39,15 @@ npm run dev       # tsx src/index.ts
 - The backend also enters mock mode automatically when `KVCDN_ISSUER_URL` is unset, but `KVCDN_MOCK_OIDC=true` makes the mock path explicit.
 - Backend S3 setup: `forcePathStyle: true`, default `region: "us-east-1"`.
 - Backend artifact S3 layout: `artifacts/customers/{customer_id}/orgs/{org}/projects/{project}/{artifact_id}/` with `.meta.json` metadata sidecar.
-- `GET /v1/quota` returns the authenticated customer's quota limits and current utilization (organizations, projects, artifacts, storage bytes). Limits are configurable via `KVCDN_QUOTA_ORGS`, `KVCDN_QUOTA_PROJECTS`, `KVCDN_QUOTA_ARTIFACTS`, and `KVCDN_QUOTA_STORAGE_BYTES`.
+- `GET /api/v1/quota` returns the authenticated customer's quota limits and current utilization (organizations, projects, artifacts, storage bytes). Limits are configurable via `KVCDN_QUOTA_ORGS`, `KVCDN_QUOTA_PROJECTS`, `KVCDN_QUOTA_ARTIFACTS`, and `KVCDN_QUOTA_STORAGE_BYTES`.
 - The CLI exposes the same data through `kvcdn quota` (default table output) and `kvcdn quota --format json`.
 - `backend/tsconfig.json` excludes `src/**/*.test.ts`; `jest.config.js` uses `ts-jest` with `useESM: true` and maps `.js` imports back to `.ts` files. Do not run `jest` without `NODE_OPTIONS='--experimental-vm-modules'`.
 - CLI config resolution order for hosted commands: CLI flag → `KVCDN_*` env var → `~/.config/kvcdn/config.toml` → default.
 - KV cache files use the `.kv` extension. Explicit `--kv-path`/`--output`/`--input` paths that do not end in `.kv` are automatically suffixed with `.kv`.
 - `scripts/build-release.sh` runs the full Dagger `Release` pipeline (Rust lint/test, backend tests, release build, SBOM, Trivy scan, optional cosign signing). Set `COSIGN_PRIVATE_KEY` to produce `.sig` files.
 - `kvcdn login` opens a browser by default; use `--no-browser` in headless/automated environments.
-- API keys are deterministic per org: `kv_<hex>` derived from `KVCDN_API_KEY_SEED` + org slug via HKDF-SHA256. Mint them with `POST /v1/admin/api-keys` using `KVCDN_ADMIN_SECRET`.
-- The hosted inference endpoint (`POST /v1/orgs/:org/projects/:project/artifacts/:artifact_id/infer`) requires the `kvcdn` release binary to be on the backend's `PATH` or pointed to by `KVCDN_BINARY_PATH`.
+- API keys are deterministic per org: `kv_<hex>` derived from `KVCDN_API_KEY_SEED` + org slug via HKDF-SHA256. Mint them with `POST /api/v1/admin/api-keys` using `KVCDN_ADMIN_SECRET`.
+- The hosted inference endpoint (`POST /api/v1/orgs/:org/projects/:project/artifacts/:artifact_id/infer`) requires the `kvcdn` release binary to be on the backend's `PATH` or pointed to by `KVCDN_BINARY_PATH`.
+- The CLI's hosted artifact commands target the flat production routes (`/api/v1/artifacts`, `/upload-url`, `/{id}/confirm-upload`, `/{id}/download-url`, `DELETE /{id}`); org/project scoping comes from the API key or login session, not URL segments. `--org`/`--project` flags are accepted for backwards compatibility but do not affect routing. The bundled `backend/` still serves the nested `/api/v1/orgs/:org/projects/:project/artifacts` shape, so it is not a drop-in target for hosted CLI commands.
+- Model downloads go to the Hugging Face cache resolved as `HF_HUB_CACHE` → `$HF_HOME/hub` → `~/.cache/huggingface/hub` (`src/models/engine.rs` `hf_api()`).
 - When adding or updating a model adapter, run `scripts/validate-adapters.sh` to prove token-exact verify and quantized verify against the tracked reference checkpoints (currently Qwen2-0.5B and Phi-3-mini-4k-instruct). Add new architectures to the `KVCDN_VALIDATE_MODELS` list in the script once they pass.

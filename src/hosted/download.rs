@@ -19,7 +19,7 @@ pub fn run(args: crate::cli::DownloadArgs) -> Result<()> {
 
     let mut client = ApiClient::new(cfg)?;
     let init = client
-        .get_download_url(&args.artifact_id, &org, &project)
+        .get_download_url(&args.artifact_id)
         .context("failed to initiate download")?;
     if init.artifact_id != args.artifact_id {
         anyhow::bail!(

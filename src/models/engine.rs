@@ -5,7 +5,7 @@ use anyhow::Result;
 use candle_core::{DType, Device};
 use candle_nn::VarBuilder;
 use hf_hub::Repo;
-use hf_hub::api::sync::Api;
+use hf_hub::api::sync::{Api, ApiBuilder};
 use tokenizers::Tokenizer;
 
 use crate::core::common;
@@ -37,6 +37,20 @@ struct RawConfig {
     architectures: Vec<String>,
 }
 
+/// Build the Hugging Face Hub API client, honoring the standard cache
+/// location environment variables. `HF_HUB_CACHE` (the exact cache directory)
+/// takes precedence; otherwise `HF_HOME` is used with `/hub` appended (handled
+/// by `ApiBuilder::from_env`); otherwise the default
+/// `~/.cache/huggingface/hub` is used.
+fn hf_api() -> Result<Api> {
+    if let Ok(cache_dir) = std::env::var("HF_HUB_CACHE")
+        && !cache_dir.is_empty()
+    {
+        return Ok(ApiBuilder::new().with_cache_dir(cache_dir.into()).build()?);
+    }
+    Ok(ApiBuilder::from_env().build()?)
+}
+
 pub fn load_model(model_name: &str, revision: &str, dtype: DType) -> Result<ModelBundle> {
     load_model_on(model_name, revision, dtype, common::pick_device()?)
 }
@@ -47,7 +61,7 @@ pub fn load_model_on(
     dtype: DType,
     device: Device,
 ) -> Result<ModelBundle> {
-    let api = Api::new()?;
+    let api = hf_api()?;
     let repo = api.repo(Repo::with_revision(
         model_name.to_string(),
         hf_hub::RepoType::Model,

@@ -34,7 +34,7 @@ pub fn run(args: crate::cli::DeleteArgs) -> Result<()> {
 
     let mut client = ApiClient::new(cfg)?;
     client
-        .delete_artifact(&args.artifact_id, &org, &project)
+        .delete_artifact(&args.artifact_id)
         .context("failed to delete artifact")?;
     println!(
         "Deleted artifact {} from project {}.",

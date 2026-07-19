@@ -20,16 +20,29 @@ pub struct UploadMeta {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactMeta {
+    /// The production API returns `id`; older backends returned `artifact_id`.
+    #[serde(alias = "id")]
     pub artifact_id: String,
+    /// The production API returns `model_name`; older backends returned `name`.
+    #[serde(alias = "model_name")]
     pub name: String,
+    #[serde(default)]
     pub size_bytes: u64,
+    #[serde(default)]
     pub sha256: String,
+    #[serde(default)]
     pub dtype: String,
+    #[serde(default)]
     pub storage_dtype: Option<String>,
+    #[serde(default)]
     pub num_tokens: usize,
+    #[serde(default)]
     pub num_layers: usize,
+    #[serde(default)]
     pub quantized: bool,
+    #[serde(default)]
     pub visibility: String,
+    #[serde(default)]
     pub created_at: String,
 }
 
@@ -70,7 +83,62 @@ pub struct DownloadInitResponse {
 #[derive(Debug, Clone, Deserialize)]
 pub struct UploadInitResponse {
     pub artifact_id: String,
+    /// The production API returns `url`; older backends returned `upload_url`.
+    #[serde(alias = "url")]
     pub upload_url: String,
+}
+
+/// Request body for `POST /api/v1/artifacts/upload-url`. The portal reads the
+/// top-level fields; everything under `metadata` is stored verbatim and
+/// returned on artifact reads.
+#[derive(Debug, Serialize)]
+struct UploadInitRequest<'a> {
+    model_name: &'a str,
+    dtype: &'a str,
+    num_tokens: usize,
+    visibility: &'a str,
+    size_bytes: u64,
+    checksum: &'a str,
+    metadata: UploadExtraMetadata<'a>,
+}
+
+#[derive(Debug, Serialize)]
+struct UploadExtraMetadata<'a> {
+    name: &'a str,
+    sha256: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    storage_dtype: Option<&'a str>,
+    num_layers: usize,
+    quantized: bool,
+}
+
+impl<'a> From<&'a UploadMeta> for UploadInitRequest<'a> {
+    fn from(meta: &'a UploadMeta) -> Self {
+        Self {
+            model_name: &meta.name,
+            dtype: &meta.dtype,
+            num_tokens: meta.num_tokens,
+            visibility: &meta.visibility,
+            size_bytes: meta.size_bytes,
+            checksum: &meta.sha256,
+            metadata: UploadExtraMetadata {
+                name: &meta.name,
+                sha256: &meta.sha256,
+                storage_dtype: meta.storage_dtype.as_deref(),
+                num_layers: meta.num_layers,
+                quantized: meta.quantized,
+            },
+        }
+    }
+}
+
+/// Request body for `POST /api/v1/artifacts/{id}/confirm-upload`.
+#[derive(Debug, Serialize)]
+struct ConfirmUploadRequest<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    digest: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size_bytes: Option<u64>,
 }
 
 pub struct ApiClient {
@@ -111,36 +179,38 @@ impl ApiClient {
         }
     }
 
-    pub fn init_upload(
-        &mut self,
-        org: &str,
-        project: &str,
-        meta: &UploadMeta,
-    ) -> Result<UploadInitResponse> {
+    pub fn init_upload(&mut self, meta: &UploadMeta) -> Result<UploadInitResponse> {
         let token = self.bearer_token()?;
-        let url = upload_init_url(&self.cfg.api_url, org, project)?;
+        let url = upload_init_url(&self.cfg.api_url)?;
+        let body = UploadInitRequest::from(meta);
         let resp = self
             .client
-            .post_json(&url, &token, meta)
+            .post_json(&url, &token, &body)
             .with_context(|| format!("POST {url}"))?;
         let resp = crate::hosted::http::Client::require_auth_success(resp, &url)?;
         resp.json().context("parsing upload init response")
     }
 
-    pub fn complete_upload(&mut self, org: &str, project: &str, artifact_id: &str) -> Result<()> {
+    pub fn complete_upload(
+        &mut self,
+        artifact_id: &str,
+        digest: Option<&str>,
+        size_bytes: Option<u64>,
+    ) -> Result<()> {
         let token = self.bearer_token()?;
-        let url = complete_upload_url(&self.cfg.api_url, org, project, artifact_id)?;
+        let url = complete_upload_url(&self.cfg.api_url, artifact_id)?;
+        let body = ConfirmUploadRequest { digest, size_bytes };
         let resp = self
             .client
-            .post_empty_bearer(&url, &token)
+            .post_json(&url, &token, &body)
             .with_context(|| format!("POST {url}"))?;
         crate::hosted::http::Client::require_auth_success(resp, &url)?;
         Ok(())
     }
 
-    pub fn delete_artifact(&mut self, artifact_id: &str, org: &str, project: &str) -> Result<()> {
+    pub fn delete_artifact(&mut self, artifact_id: &str) -> Result<()> {
         let token = self.bearer_token()?;
-        let url = delete_artifact_url(&self.cfg.api_url, org, project, artifact_id)?;
+        let url = delete_artifact_url(&self.cfg.api_url, artifact_id)?;
         let resp = self
             .client
             .delete_bearer(&url, &token)
@@ -149,9 +219,9 @@ impl ApiClient {
         Ok(())
     }
 
-    pub fn list_artifacts(&mut self, org: &str, project: &str) -> Result<Vec<ArtifactMeta>> {
+    pub fn list_artifacts(&mut self) -> Result<Vec<ArtifactMeta>> {
         let token = self.bearer_token()?;
-        let url = list_artifacts_url(&self.cfg.api_url, org, project)?;
+        let url = list_artifacts_url(&self.cfg.api_url)?;
         let resp = self
             .client
             .get_bearer(&url, &token)
@@ -161,18 +231,13 @@ impl ApiClient {
         Ok(body.artifacts)
     }
 
-    pub fn get_download_url(
-        &mut self,
-        artifact_id: &str,
-        org: &str,
-        project: &str,
-    ) -> Result<DownloadInitResponse> {
+    pub fn get_download_url(&mut self, artifact_id: &str) -> Result<DownloadInitResponse> {
         let token = self.bearer_token()?;
-        let url = download_artifact_url(&self.cfg.api_url, org, project, artifact_id)?;
+        let url = download_artifact_url(&self.cfg.api_url, artifact_id)?;
         let resp = self
             .client
-            .get_bearer(&url, &token)
-            .with_context(|| format!("GET {url}"))?;
+            .post_empty_bearer(&url, &token)
+            .with_context(|| format!("POST {url}"))?;
         let resp = crate::hosted::http::Client::require_auth_success(resp, &url)?;
         let body: DownloadInitResponse = resp.json().context("parsing download init response")?;
         Ok(body)
@@ -259,94 +324,37 @@ impl ApiClient {
     }
 }
 
-fn upload_init_url(api_url: &str, org: &str, project: &str) -> Result<String> {
+/// Build a URL under the fixed `/api/v1` prefix. Artifacts are scoped by the
+/// API key (or login session), so the routes do not carry org/project segments.
+fn api_v1_url(api_url: &str, segments: &[&str]) -> Result<String> {
     let mut url = url::Url::parse(api_url)?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow!("cannot modify URL path"))?
-        .push("api")
-        .push("v1")
-        .push("orgs")
-        .push(org)
-        .push("projects")
-        .push(project)
-        .push("artifacts");
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| anyhow!("cannot modify URL path"))?;
+        path.push("api").push("v1").extend(segments.iter().copied());
+    }
     Ok(url.to_string())
 }
 
-fn delete_artifact_url(
-    api_url: &str,
-    org: &str,
-    project: &str,
-    artifact_id: &str,
-) -> Result<String> {
-    let mut url = url::Url::parse(api_url)?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow!("cannot modify URL path"))?
-        .push("api")
-        .push("v1")
-        .push("orgs")
-        .push(org)
-        .push("projects")
-        .push(project)
-        .push("artifacts")
-        .push(artifact_id);
-    Ok(url.to_string())
+fn upload_init_url(api_url: &str) -> Result<String> {
+    api_v1_url(api_url, &["artifacts", "upload-url"])
 }
 
-fn list_artifacts_url(api_url: &str, org: &str, project: &str) -> Result<String> {
-    let mut url = url::Url::parse(api_url)?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow!("cannot modify URL path"))?
-        .push("api")
-        .push("v1")
-        .push("orgs")
-        .push(org)
-        .push("projects")
-        .push(project)
-        .push("artifacts");
-    Ok(url.to_string())
+fn delete_artifact_url(api_url: &str, artifact_id: &str) -> Result<String> {
+    api_v1_url(api_url, &["artifacts", artifact_id])
 }
 
-fn download_artifact_url(
-    api_url: &str,
-    org: &str,
-    project: &str,
-    artifact_id: &str,
-) -> Result<String> {
-    let mut url = url::Url::parse(api_url)?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow!("cannot modify URL path"))?
-        .push("api")
-        .push("v1")
-        .push("orgs")
-        .push(org)
-        .push("projects")
-        .push(project)
-        .push("artifacts")
-        .push(artifact_id)
-        .push("download");
-    Ok(url.to_string())
+fn list_artifacts_url(api_url: &str) -> Result<String> {
+    api_v1_url(api_url, &["artifacts"])
 }
 
-fn complete_upload_url(
-    api_url: &str,
-    org: &str,
-    project: &str,
-    artifact_id: &str,
-) -> Result<String> {
-    let mut url = url::Url::parse(api_url)?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow!("cannot modify URL path"))?
-        .push("api")
-        .push("v1")
-        .push("orgs")
-        .push(org)
-        .push("projects")
-        .push(project)
-        .push("artifacts")
-        .push(artifact_id)
-        .push("complete");
-    Ok(url.to_string())
+fn download_artifact_url(api_url: &str, artifact_id: &str) -> Result<String> {
+    api_v1_url(api_url, &["artifacts", artifact_id, "download-url"])
+}
+
+fn complete_upload_url(api_url: &str, artifact_id: &str) -> Result<String> {
+    api_v1_url(api_url, &["artifacts", artifact_id, "confirm-upload"])
 }
 
 fn quota_url(api_url: &str) -> Result<String> {
@@ -395,11 +403,11 @@ mod tests {
             .with_body(r#"{"access_token":"new_token","expires_in":3600}"#)
             .create();
 
-        let body = r#"{"artifact_id":"abc","upload_url":"https://example.com/upload"}"#;
+        let body = r#"{"artifact_id":"abc","url":"https://example.com/upload"}"#;
         let _init = server
-            .mock("POST", "/api/v1/orgs/default/projects/default/artifacts")
+            .mock("POST", "/api/v1/artifacts/upload-url")
             .match_header("authorization", "Bearer new_token")
-            .with_status(201)
+            .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(body)
             .create();
@@ -426,7 +434,7 @@ mod tests {
             quantized: false,
             visibility: "private".to_string(),
         };
-        let resp = client.init_upload("default", "default", &meta).unwrap();
+        let resp = client.init_upload(&meta).unwrap();
 
         assert_eq!(resp.artifact_id, "abc");
         assert_eq!(resp.upload_url, "https://example.com/upload");
@@ -437,11 +445,11 @@ mod tests {
         let mut server = mockito::Server::new();
         let base = server.url();
 
-        let body = r#"{"artifact_id":"artifact-1","upload_url":"https://example.com/upload"}"#;
+        let body = r#"{"artifact_id":"artifact-1","url":"https://example.com/upload"}"#;
         let _init = server
-            .mock("POST", "/api/v1/orgs/default/projects/default/artifacts")
+            .mock("POST", "/api/v1/artifacts/upload-url")
             .match_header("authorization", "Bearer kv_test_key_123")
-            .with_status(201)
+            .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(body)
             .create();
@@ -469,34 +477,36 @@ mod tests {
             quantized: false,
             visibility: "private".to_string(),
         };
-        let resp = client.init_upload("default", "default", &meta).unwrap();
+        let resp = client.init_upload(&meta).unwrap();
         assert_eq!(resp.artifact_id, "artifact-1");
         assert_eq!(resp.upload_url, "https://example.com/upload");
     }
 
     #[test]
-    fn init_upload_url_uses_v1_orgs_projects_artifacts() {
-        let url = upload_init_url("https://api.example.com", "default", "default").unwrap();
-        assert!(url.contains("/api/v1/orgs/default/projects/default/artifacts"));
+    fn init_upload_url_uses_flat_artifacts_upload_url() {
+        let url = upload_init_url("https://api.example.com").unwrap();
+        assert_eq!(url, "https://api.example.com/api/v1/artifacts/upload-url");
     }
 
     #[test]
-    fn delete_artifact_url_uses_v1_orgs_projects_artifacts_id() {
-        let url = delete_artifact_url("https://api.example.com", "default", "acme", "abc").unwrap();
-        assert!(url.contains("/api/v1/orgs/default/projects/acme/artifacts/abc"));
+    fn delete_artifact_url_uses_flat_artifacts_id() {
+        let url = delete_artifact_url("https://api.example.com", "abc").unwrap();
+        assert_eq!(url, "https://api.example.com/api/v1/artifacts/abc");
     }
 
     #[test]
-    fn list_artifacts_url_uses_v1_orgs_projects_artifacts() {
-        let url = list_artifacts_url("https://api.example.com", "default", "acme").unwrap();
-        assert!(url.contains("/api/v1/orgs/default/projects/acme/artifacts"));
+    fn list_artifacts_url_uses_flat_artifacts() {
+        let url = list_artifacts_url("https://api.example.com").unwrap();
+        assert_eq!(url, "https://api.example.com/api/v1/artifacts");
     }
 
     #[test]
-    fn download_artifact_url_uses_v1_orgs_projects_artifacts_id_download() {
-        let url =
-            download_artifact_url("https://api.example.com", "default", "acme", "abc").unwrap();
-        assert!(url.contains("/api/v1/orgs/default/projects/acme/artifacts/abc/download"));
+    fn download_artifact_url_uses_flat_artifacts_id_download_url() {
+        let url = download_artifact_url("https://api.example.com", "abc").unwrap();
+        assert_eq!(
+            url,
+            "https://api.example.com/api/v1/artifacts/abc/download-url"
+        );
     }
 
     #[test]
@@ -544,10 +554,7 @@ mod tests {
         let base = server.url();
 
         let _delete = server
-            .mock(
-                "DELETE",
-                "/api/v1/orgs/default/projects/acme/artifacts/artifact-1",
-            )
+            .mock("DELETE", "/api/v1/artifacts/artifact-1")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(204)
             .create();
@@ -564,9 +571,7 @@ mod tests {
 
         let credentials = StaticCredentialStore::api_key("kv_test_key_123".to_string());
         let mut client = ApiClient::new_testable(cfg, Box::new(credentials)).unwrap();
-        client
-            .delete_artifact("artifact-1", "default", "acme")
-            .unwrap();
+        client.delete_artifact("artifact-1").unwrap();
     }
 
     #[test]
@@ -575,10 +580,7 @@ mod tests {
         let base = server.url();
 
         let _complete = server
-            .mock(
-                "POST",
-                "/api/v1/orgs/acme/projects/widgets/artifacts/artifact-2/complete",
-            )
+            .mock("POST", "/api/v1/artifacts/artifact-2/confirm-upload")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
             .create();
@@ -596,7 +598,7 @@ mod tests {
         let credentials = StaticCredentialStore::api_key("kv_test_key_123".to_string());
         let mut client = ApiClient::new_testable(cfg, Box::new(credentials)).unwrap();
         client
-            .complete_upload("acme", "widgets", "artifact-2")
+            .complete_upload("artifact-2", Some(&"ab".repeat(32)), Some(200))
             .unwrap();
     }
 
@@ -605,9 +607,9 @@ mod tests {
         let mut server = mockito::Server::new();
         let base = server.url();
 
-        let body = r#"{"artifacts":[{"artifact_id":"a1","name":"first","size_bytes":100,"sha256":"deadbeef","dtype":"F16","storage_dtype":null,"num_tokens":8,"num_layers":2,"quantized":false,"visibility":"private","created_at":"2024-01-01T00:00:00Z"}]}"#;
+        let body = r#"{"artifacts":[{"id":"a1","model_name":"first","size_bytes":100,"dtype":"F16","num_tokens":8,"visibility":"private","public_url":null}],"total":1,"limit":50,"offset":0}"#;
         let _list = server
-            .mock("GET", "/api/v1/orgs/acme/projects/widgets/artifacts")
+            .mock("GET", "/api/v1/artifacts")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -626,10 +628,13 @@ mod tests {
 
         let credentials = StaticCredentialStore::api_key("kv_test_key_123".to_string());
         let mut client = ApiClient::new_testable(cfg, Box::new(credentials)).unwrap();
-        let artifacts = client.list_artifacts("acme", "widgets").unwrap();
+        let artifacts = client.list_artifacts().unwrap();
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].artifact_id, "a1");
         assert_eq!(artifacts[0].name, "first");
+        // Fields the flat list response does not carry fall back to defaults.
+        assert_eq!(artifacts[0].sha256, "");
+        assert_eq!(artifacts[0].num_layers, 0);
     }
 
     #[test]
@@ -639,10 +644,7 @@ mod tests {
 
         let body = r#"{"artifact_id":"a1","download_url":"https://example.com/download"}"#;
         let _download = server
-            .mock(
-                "GET",
-                "/api/v1/orgs/acme/projects/widgets/artifacts/a1/download",
-            )
+            .mock("POST", "/api/v1/artifacts/a1/download-url")
             .match_header("authorization", "Bearer kv_test_key_123")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -661,7 +663,7 @@ mod tests {
 
         let credentials = StaticCredentialStore::api_key("kv_test_key_123".to_string());
         let mut client = ApiClient::new_testable(cfg, Box::new(credentials)).unwrap();
-        let resp = client.get_download_url("a1", "acme", "widgets").unwrap();
+        let resp = client.get_download_url("a1").unwrap();
         assert_eq!(resp.artifact_id, "a1");
         assert_eq!(resp.download_url, "https://example.com/download");
     }
@@ -672,35 +674,29 @@ mod tests {
         let base = server.url();
 
         let _init = server
-            .mock("POST", "/api/v1/orgs/acme/projects/widgets/artifacts")
+            .mock("POST", "/api/v1/artifacts/upload-url")
             .match_header("authorization", "Bearer kv_round_trip_key")
-            .with_status(201)
+            .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{"artifact_id":"rt1","upload_url":"https://example.com/upload"}"#)
+            .with_body(r#"{"artifact_id":"rt1","url":"https://example.com/upload"}"#)
             .create();
 
         let _complete = server
-            .mock(
-                "POST",
-                "/api/v1/orgs/acme/projects/widgets/artifacts/rt1/complete",
-            )
+            .mock("POST", "/api/v1/artifacts/rt1/confirm-upload")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(200)
             .create();
 
         let _list = server
-            .mock("GET", "/api/v1/orgs/acme/projects/widgets/artifacts")
+            .mock("GET", "/api/v1/artifacts")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{"artifacts":[{"artifact_id":"rt1","name":"rt","size_bytes":1,"sha256":"aa","dtype":"F16","storage_dtype":null,"num_tokens":1,"num_layers":1,"quantized":false,"visibility":"private","created_at":"2024-01-01T00:00:00Z"}]}"#)
+            .with_body(r#"{"artifacts":[{"id":"rt1","model_name":"rt","size_bytes":1,"dtype":"F16","num_tokens":1,"visibility":"private","public_url":null}],"total":1,"limit":50,"offset":0}"#)
             .create();
 
         let _download = server
-            .mock(
-                "GET",
-                "/api/v1/orgs/acme/projects/widgets/artifacts/rt1/download",
-            )
+            .mock("POST", "/api/v1/artifacts/rt1/download-url")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -708,7 +704,7 @@ mod tests {
             .create();
 
         let _delete = server
-            .mock("DELETE", "/api/v1/orgs/acme/projects/widgets/artifacts/rt1")
+            .mock("DELETE", "/api/v1/artifacts/rt1")
             .match_header("authorization", "Bearer kv_round_trip_key")
             .with_status(204)
             .create();
@@ -737,19 +733,19 @@ mod tests {
             quantized: false,
             visibility: "private".to_string(),
         };
-        let init = client.init_upload("acme", "widgets", &meta).unwrap();
+        let init = client.init_upload(&meta).unwrap();
         assert_eq!(init.artifact_id, "rt1");
 
         client
-            .complete_upload("acme", "widgets", &init.artifact_id)
+            .complete_upload(&init.artifact_id, Some("aa"), Some(1))
             .unwrap();
 
-        let artifacts = client.list_artifacts("acme", "widgets").unwrap();
+        let artifacts = client.list_artifacts().unwrap();
         assert!(artifacts.iter().any(|a| a.artifact_id == "rt1"));
 
-        let download = client.get_download_url("rt1", "acme", "widgets").unwrap();
+        let download = client.get_download_url("rt1").unwrap();
         assert_eq!(download.download_url, "https://example.com/dl");
 
-        client.delete_artifact("rt1", "acme", "widgets").unwrap();
+        client.delete_artifact("rt1").unwrap();
     }
 }

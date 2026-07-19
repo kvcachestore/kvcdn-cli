@@ -62,7 +62,7 @@ pub fn run(args: crate::cli::UploadArgs) -> Result<()> {
 
     let mut client = ApiClient::new(cfg)?;
     let init = client
-        .init_upload(&org, &project, &meta)
+        .init_upload(&meta)
         .context("failed to initiate upload")?;
     println!(
         "uploading to {} (org: {}, project: {})",
@@ -77,7 +77,7 @@ pub fn run(args: crate::cli::UploadArgs) -> Result<()> {
         .context("failed to upload artifact")?;
 
     client
-        .complete_upload(&org, &project, &init.artifact_id)
+        .complete_upload(&init.artifact_id, Some(&sha256), Some(size_bytes))
         .context("upload completed but server-side verification failed")?;
 
     println!("Uploaded {} as artifact {}", args.path, init.artifact_id);
