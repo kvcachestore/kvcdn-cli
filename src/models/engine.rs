@@ -39,16 +39,17 @@ struct RawConfig {
 
 /// Build the Hugging Face Hub API client, honoring the standard cache
 /// location environment variables. `HF_HUB_CACHE` (the exact cache directory)
-/// takes precedence; otherwise `HF_HOME` is used with `/hub` appended (handled
-/// by `ApiBuilder::from_env`); otherwise the default
-/// `~/.cache/huggingface/hub` is used.
+/// takes precedence; otherwise `HF_HOME` is used with `/hub` appended;
+/// otherwise the default `~/.cache/huggingface/hub` is used. `HF_ENDPOINT`
+/// is honored in all cases via `ApiBuilder::from_env`.
 fn hf_api() -> Result<Api> {
+    let builder = ApiBuilder::from_env();
     if let Ok(cache_dir) = std::env::var("HF_HUB_CACHE")
         && !cache_dir.is_empty()
     {
-        return Ok(ApiBuilder::new().with_cache_dir(cache_dir.into()).build()?);
+        return Ok(builder.with_cache_dir(cache_dir.into()).build()?);
     }
-    Ok(ApiBuilder::from_env().build()?)
+    Ok(builder.build()?)
 }
 
 pub fn load_model(model_name: &str, revision: &str, dtype: DType) -> Result<ModelBundle> {

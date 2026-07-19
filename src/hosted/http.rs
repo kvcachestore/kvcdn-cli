@@ -88,7 +88,7 @@ impl Client {
     /// status before calling this.
     pub fn require_auth_success(resp: Response, url: &str) -> Result<Response> {
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-            anyhow::bail!("session expired; run `kvcdn login`");
+            anyhow::bail!("unauthorized; check your API key or run `kvcdn login`");
         }
         if !resp.status().is_success() {
             let text = resp.text().unwrap_or_default();
